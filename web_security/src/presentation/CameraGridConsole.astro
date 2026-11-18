@@ -1,10 +1,9 @@
 ---
 /**
  * Presentation Component: CameraGridConsole.astro
- * Complete 6-Camera Monitoring Console:
- * - Camera 01: Active local webcam feed connected to the Keras model inference loop
- * - Telemetry Panel: Softmax distribution across the 7 classes, gender/threat readout, and alert log
- * - Cameras 02 to 06: Remote server camera nodes temporarily disabled
+ * Central CCTV Matrix & Monitoring Console:
+ * - 6-Camera Grid (CAM-01 Local Active + CAM-02..06 Server Standby)
+ * - Live AI Telemetry Panel
  */
 import { DEFAULT_SIX_CAMERA_NODES } from '../domain';
 import ActiveCameraViewport from './ActiveCameraViewport.astro';
@@ -16,57 +15,40 @@ const disabledServerCameras = DEFAULT_SIX_CAMERA_NODES.filter(
 );
 ---
 
-<section class="console-section" id="matriz-camaras" aria-labelledby="console-heading">
-  <div class="console-section-header">
-    <div class="console-heading-block">
-      <h2 class="console-heading" id="console-heading">
-        Matriz operativa de 6 cámaras de seguridad
-      </h2>
-      <p class="console-subheading">
-        La Cámara 01 procesa el video de este dispositivo en tiempo real hacia el modelo compilado en Keras.
-        Las Cámaras 02 a 06 mantienen comunicación de estado con el servidor central pero se encuentran
-        temporalmente deshabilitadas.
-      </p>
+<div class="console-workspace-layout">
+  <!-- Columna principal: Matriz de 6 Cámaras -->
+  <section class="cctv-matrix-section" aria-label="Matriz de 6 cámaras de seguridad">
+    <div class="matrix-toolbar">
+      <div class="matrix-title-group">
+        <h2 class="matrix-heading">Matriz de Monitoreo CCTV</h2>
+        <span class="matrix-badge-topology">6 Canales · 1 Activo / 5 En Espera</span>
+      </div>
+
+      <div class="matrix-actions">
+        <button type="button" class="btn-matrix-action" id="btn-sync-cameras" title="Consultar estado de las 6 cámaras">
+          Sincronizar Nodos
+        </button>
+      </div>
     </div>
 
-    <div class="console-topology-summary">
-      <div class="topology-counter">
-        <span class="counter-label">Cámaras totales:</span>
-        <strong class="counter-value" id="summary-total-cameras">6</strong>
+    <!-- La Grilla de 6 Cámaras unificada -->
+    <div class="cctv-six-grid" role="region" aria-label="Cuadrícula de cámaras">
+      <!-- Canal 01: Cámara Local Activa (Dispositivo actual) -->
+      <div class="cctv-grid-cell cell-active">
+        <ActiveCameraViewport />
       </div>
-      <div class="topology-counter">
-        <span class="counter-label">Activa en dispositivo:</span>
-        <strong class="counter-value counter-active" id="summary-active-cameras">1</strong>
-      </div>
-      <div class="topology-counter">
-        <span class="counter-label">Deshabilitadas en servidor:</span>
-        <strong class="counter-value counter-standby" id="summary-disabled-cameras">5</strong>
-      </div>
-      <button type="button" class="btn-sync-topology" id="btn-sync-cameras">
-        Sincronizar nodos con servidor
-      </button>
-    </div>
-  </div>
 
-  <div class="primary-monitoring-workspace">
-    <ActiveCameraViewport />
-    <ModelTelemetryPanel />
-  </div>
-
-  <div class="server-nodes-subsection">
-    <div class="server-nodes-header">
-      <h3 class="server-nodes-title">
-        Nodos remotos comunicados con el servidor (Cámaras 02 a 06 deshabilitadas temporalmente)
-      </h3>
-      <span class="server-nodes-status" id="server-nodes-sync-label">
-        Estado reportado por GET /api/v1/cameras
-      </span>
-    </div>
-
-    <div class="disabled-cameras-grid" role="list" aria-label="Cámaras de servidor temporalmente deshabilitadas">
+      <!-- Canales 02 a 06: Cámaras Remotas en Servidor -->
       {disabledServerCameras.map((cameraNode) => (
-        <DisabledServerCameraCard node={cameraNode} />
+        <div class="cctv-grid-cell cell-remote">
+          <DisabledServerCameraCard node={cameraNode} />
+        </div>
       ))}
     </div>
+  </section>
+
+  <!-- Columna lateral: Panel de Telemetría de IA -->
+  <div class="console-sidebar-column">
+    <ModelTelemetryPanel />
   </div>
-</section>
+</div>

@@ -1,7 +1,7 @@
 /**
  * Presentation Controller: consoleClientBootstrap.ts
  * Wires Clean Architecture Use Cases and Infrastructure Adapters to the Astro DOM.
- * 100% autonomous detection from real continuous video frames. Zero scenario forcing.
+ * 100% autonomous detection from real continuous video frames. Auto-connects on boot.
  */
 
 import {
@@ -31,7 +31,8 @@ export function bootstrapSecurityConsole(): void {
 
   const headerDot = document.getElementById('header-backend-dot');
   const headerText = document.getElementById('header-backend-text');
-  const hudSourceMode = document.getElementById('hud-source-mode');
+  const globalThreatBadge = document.getElementById('soc-global-threat-badge');
+  const globalThreatText = document.getElementById('soc-threat-text');
   const hudPredictedClass = document.getElementById('hud-predicted-class');
   const hudSubjectGender = document.getElementById('hud-subject-gender');
   const hudFrameCount = document.getElementById('hud-frame-count');
@@ -53,43 +54,42 @@ export function bootstrapSecurityConsole(): void {
   const alertLogList = document.getElementById('security-alert-log');
 
   const updateTopologyAndHealthUI = async (targetCameraId?: string): Promise<void> => {
-    const snapshot = await gridUseCase.execute();
+    try {
+      const snapshot = await gridUseCase.execute();
 
-    if (headerDot && headerText) {
-      if (snapshot.backendHealth.online) {
-        headerDot.className = 'engine-dot engine-dot-online';
-        headerText.textContent = `Motor activo: ${snapshot.backendHealth.backend_engine} (${snapshot.backendHealth.device})`;
-      } else {
+      if (headerDot && headerText) {
+        if (snapshot.backendHealth.online) {
+          headerDot.className = 'engine-dot engine-dot-online';
+          headerText.textContent = `IA CUDA: ONLINE (${snapshot.backendHealth.device || 'RTX 5050'})`;
+        } else {
+          headerDot.className = 'engine-dot engine-dot-standby';
+          headerText.textContent = 'IA :8000 EN ESPERA';
+        }
+      }
+
+      const activeEl = document.getElementById('summary-active-cameras');
+      if (activeEl) activeEl.textContent = String(snapshot.activeCount);
+
+      const nowTime = new Date().toLocaleTimeString('es-CO', { hour12: false });
+
+      for (const node of snapshot.disabledServerNodes) {
+        if (targetCameraId && node.camera_id !== targetCameraId) {
+          continue;
+        }
+        const reasonEl = document.querySelector(`[data-reason-for="${node.camera_id}"]`);
+        const endpointEl = document.querySelector(`[data-endpoint-for="${node.camera_id}"]`);
+
+        if (reasonEl) {
+          reasonEl.textContent = `${node.status_reason} (${nowTime})`;
+        }
+        if (endpointEl) {
+          endpointEl.textContent = node.stream_endpoint;
+        }
+      }
+    } catch {
+      if (headerDot && headerText) {
         headerDot.className = 'engine-dot engine-dot-standby';
-        headerText.textContent = snapshot.backendHealth.status_message;
-      }
-    }
-
-    const totalEl = document.getElementById('summary-total-cameras');
-    const activeEl = document.getElementById('summary-active-cameras');
-    const disabledEl = document.getElementById('summary-disabled-cameras');
-    if (totalEl) totalEl.textContent = String(snapshot.totalCount);
-    if (activeEl) activeEl.textContent = String(snapshot.activeCount);
-    if (disabledEl) disabledEl.textContent = String(snapshot.disabledCount);
-
-    const nowTime = new Date().toLocaleTimeString('es-CO', { hour12: false });
-
-    for (const node of snapshot.disabledServerNodes) {
-      if (targetCameraId && node.camera_id !== targetCameraId) {
-        continue;
-      }
-      const reasonEl = document.querySelector(`[data-reason-for="${node.camera_id}"]`);
-      const endpointEl = document.querySelector(`[data-endpoint-for="${node.camera_id}"]`);
-      const syncEl = document.querySelector(`[data-last-sync-for="${node.camera_id}"]`);
-
-      if (reasonEl) {
-        reasonEl.textContent = node.status_reason;
-      }
-      if (endpointEl) {
-        endpointEl.textContent = node.stream_endpoint;
-      }
-      if (syncEl) {
-        syncEl.textContent = `Verificado a las ${nowTime} (En espera)`;
+        headerText.textContent = 'RECONECTANDO :8000...';
       }
     }
   };
@@ -102,14 +102,14 @@ export function bootstrapSecurityConsole(): void {
     if (alerts.length === 0) {
       alertLogList.innerHTML = `
         <li class="alert-empty-state">
-          No se registran incidentes críticos. El sistema analiza continuamente el video de la cámara web física en busca de armas, agresiones o gestos de auxilio.
+          Supervisión activa sin incidentes críticos. Las alertas aparecerán aquí automáticamente.
         </li>
       `;
       return;
     }
 
     alertLogList.innerHTML = alerts
-      .slice(0, 8)
+      .slice(0, 10)
       .map((alert) => {
         const timeFormatted = new Date(alert.timestamp).toLocaleTimeString('es-CO', {
           hour12: false
@@ -117,17 +117,19 @@ export function bootstrapSecurityConsole(): void {
         const badgeClass =
           alert.threat_level === 'CRITICAL'
             ? 'alert-item-critical'
-            : 'alert-item-high';
+            : alert.threat_level === 'HIGH'
+              ? 'alert-item-high'
+              : 'alert-item-low';
         return `
           <li class="alert-log-item ${badgeClass}">
             <div class="alert-item-top">
               <span class="alert-item-title">${alert.readable_label}</span>
-              <span class="alert-item-time">${timeFormatted}</span>
+              <span class="alert-item-time mono-stat">${timeFormatted}</span>
             </div>
-            <div class="alert-item-meta">
-              <span>Nodo: ${alert.camera_id}</span>
-              <span>Sujeto: ${alert.subject_gender}</span>
-              <span>Confianza: ${(alert.confidence * 100).toFixed(1)}%</span>
+            <div class="alert-item-meta mono-stat">
+              <span>${alert.camera_id}</span>
+              <span>${alert.subject_gender}</span>
+              <span>${(alert.confidence * 100).toFixed(0)}%</span>
             </div>
             <div class="alert-item-summary">
               ${alert.summary}
@@ -155,8 +157,20 @@ export function bootstrapSecurityConsole(): void {
       ? `${dominantPerson.gender} (${(dominantPerson.gender_confidence * 100).toFixed(0)}%)`
       : 'No_Determinado';
 
+    // Top Bar Global Threat Badge
+    if (globalThreatBadge && globalThreatText) {
+      globalThreatBadge.setAttribute('data-threat', prediction.threat_level);
+      if (prediction.threat_level === 'CRITICAL') {
+        globalThreatText.textContent = 'AMENAZA CRÍTICA';
+      } else if (prediction.threat_level === 'HIGH') {
+        globalThreatText.textContent = 'ALERTA DE SEGURIDAD';
+      } else {
+        globalThreatText.textContent = 'SISTEMA NORMAL';
+      }
+    }
+
     if (hudPredictedClass) {
-      hudPredictedClass.textContent = prediction.primary_event;
+      hudPredictedClass.textContent = descriptor.readableLabel;
     }
     if (hudSubjectGender) {
       hudSubjectGender.textContent = genderDisplay;
@@ -168,7 +182,7 @@ export function bootstrapSecurityConsole(): void {
       hudEvidenceText.textContent = `${prediction.evidence.description} [Regla: ${prediction.evidence.rule_triggered}]`;
     }
     if (cam01FpsCounter) {
-      cam01FpsCounter.textContent = `Latencia: ${prediction.model_info.latency_ms.toFixed(0)} ms`;
+      cam01FpsCounter.textContent = `${prediction.model_info.latency_ms.toFixed(0)} ms`;
     }
 
     if (readoutCard) {
@@ -188,15 +202,15 @@ export function bootstrapSecurityConsole(): void {
     }
     if (readoutThreatLevel) {
       const threatMap: Record<string, string> = {
-        LOW: 'Bajo (Escena segura)',
+        LOW: 'Bajo (Normal)',
         MEDIUM: 'Medio (Precaución)',
-        HIGH: 'Alto (Intervención requerida)',
-        CRITICAL: 'Crítico (Respuesta inmediata)'
+        HIGH: 'Alto (Intervención)',
+        CRITICAL: 'Crítico (Emergencia)'
       };
       readoutThreatLevel.textContent = threatMap[prediction.threat_level] ?? prediction.threat_level;
     }
     if (readoutLatencyMs) {
-      readoutLatencyMs.textContent = `${prediction.model_info.latency_ms.toFixed(1)} ms`;
+      readoutLatencyMs.textContent = `${prediction.model_info.latency_ms.toFixed(0)} ms`;
     }
     if (readoutBackpressure) {
       readoutBackpressure.textContent = `${telemetry.skippedBackpressureFrames} omitidos`;
@@ -205,9 +219,10 @@ export function bootstrapSecurityConsole(): void {
       readoutProtocolText.textContent = `${descriptor.operationalProtocol} ${prediction.evidence.description}`;
     }
     if (telemetryModelName) {
-      telemetryModelName.textContent = `${prediction.model_info.scene_model} | ${prediction.model_info.backend}`;
+      telemetryModelName.textContent = `${prediction.model_info.scene_model} + Torchvision`;
     }
 
+    // Probability bars
     for (const clsKey of CANONICAL_DETECTION_CLASSES) {
       const rawProb = prediction.scene_probabilities[clsKey] ?? 0;
       const pct = Math.min(100, Math.max(0, rawProb * 100));
@@ -235,32 +250,27 @@ export function bootstrapSecurityConsole(): void {
 
   loopController.subscribe(updateInferenceUI);
 
+  // Conexión automática de cámara física
   const startLocalCameraFlow = async (): Promise<void> => {
-    const status = await monitorUseCase.initializeCamera();
-    if (hudSourceMode) {
-      hudSourceMode.textContent = status.hardware_available
-        ? 'Cámara física WebRTC activa'
-        : 'Dispositivo no disponible';
+    try {
+      const status = await monitorUseCase.initializeCamera();
+      if (cam01SourceDesc) {
+        cam01SourceDesc.textContent = status.description;
+      }
+      if (status.active) {
+        loopController.start();
+      }
+    } catch {
+      if (hudPredictedClass) {
+        hudPredictedClass.textContent = 'Acceso a cámara denegado o no disponible';
+      }
     }
-    if (cam01SourceDesc) {
-      cam01SourceDesc.textContent = status.description;
-    }
-    loopController.start();
   };
 
-  // Wire buttons
+  // Botones auxiliares
   const startWebcamBtn = document.getElementById('btn-start-webcam');
   if (startWebcamBtn) {
     startWebcamBtn.addEventListener('click', () => {
-      void startLocalCameraFlow();
-    });
-  }
-
-  const heroActivateBtn = document.getElementById('hero-activate-cam-btn');
-  if (heroActivateBtn) {
-    heroActivateBtn.addEventListener('click', () => {
-      const matrixSection = document.getElementById('matriz-camaras');
-      matrixSection?.scrollIntoView({ behavior: 'smooth' });
       void startLocalCameraFlow();
     });
   }
@@ -279,11 +289,11 @@ export function bootstrapSecurityConsole(): void {
       if (isCurrentlyRunning) {
         loopController.stop();
         toggleLoopBtn.setAttribute('data-running', 'false');
-        toggleLoopBtn.textContent = 'Reanudar inferencia continua';
+        toggleLoopBtn.textContent = 'Reanudar';
       } else {
         loopController.start();
         toggleLoopBtn.setAttribute('data-running', 'true');
-        toggleLoopBtn.textContent = 'Pausar inferencia continua';
+        toggleLoopBtn.textContent = 'Pausar';
       }
     });
   }
@@ -311,7 +321,12 @@ export function bootstrapSecurityConsole(): void {
     });
   }
 
-  // Initial boot sequence
+  // Auto-boot sequence
   void updateTopologyAndHealthUI();
   void startLocalCameraFlow();
+
+  // Sondeo periódico automático de salud del servidor (cada 6 segundos)
+  setInterval(() => {
+    void updateTopologyAndHealthUI();
+  }, 6000);
 }

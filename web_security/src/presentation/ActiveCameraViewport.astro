@@ -1,94 +1,91 @@
 ---
 /**
  * Presentation Component: ActiveCameraViewport.astro
- * Displays Camera 01 (Active local device camera via WebRTC getUserMedia + neural inference overlay)
- * Fully automatic detection: continuous real-time video frames sent to http://localhost:8000/api/v1/infer.
- * Zero manual scenario buttons.
+ * High-end CCTV operator viewport for Camera 01 (Local webcam).
+ * Real-time video with transparent canvas neural HUD overlay.
+ * 100% automatic live detection.
  */
 import { DEFAULT_SIX_CAMERA_NODES } from '../domain';
 
 const cam01 = DEFAULT_SIX_CAMERA_NODES[0];
 ---
 
-<article class="active-camera-panel" data-camera-id={cam01.camera_id} data-camera-status="ACTIVE">
-  <header class="camera-panel-header">
-    <div class="camera-title-group">
-      <div class="camera-id-row">
-        <span class="status-led status-led-active" aria-hidden="true"></span>
-        <span class="camera-code">{cam01.camera_id}</span>
-        <h3 class="camera-name">{cam01.label}</h3>
-      </div>
-      <p class="camera-zone-text" id="cam01-source-description">
-        {cam01.location_zone} ({cam01.resolution})
-      </p>
+<article class="cctv-camera-card cctv-active-node" data-camera-id={cam01.camera_id} data-camera-status="ACTIVE">
+  <header class="cctv-card-header">
+    <div class="cctv-id-tag">
+      <span class="cctv-led cctv-led-active" id="cam01-pulse-led" aria-hidden="true"></span>
+      <span class="cctv-code">{cam01.camera_id}</span>
+      <span class="cctv-zone-name">{cam01.location_zone}</span>
     </div>
 
-    <div class="camera-live-badges">
-      <span class="operational-badge badge-active" id="cam01-operational-badge">
-        Activa en este dispositivo
-      </span>
-      <span class="mono-stat" id="cam01-fps-counter">Latencia: -- ms</span>
+    <div class="cctv-header-metrics">
+      <span class="cctv-badge-live" id="cam01-operational-badge">LIVE · EN VIVO</span>
+      <span class="mono-stat cctv-latency" id="cam01-fps-counter">-- ms</span>
     </div>
   </header>
 
-  <div class="viewport-frame" id="cam01-viewport-container">
+  <div class="cctv-viewport-box active-viewport-box" id="cam01-viewport-container">
+    <!-- Esquinas tácticas de calibración -->
+    <div class="cctv-bracket bracket-tl" aria-hidden="true"></div>
+    <div class="cctv-bracket bracket-tr" aria-hidden="true"></div>
+    <div class="cctv-bracket bracket-bl" aria-hidden="true"></div>
+    <div class="cctv-bracket bracket-br" aria-hidden="true"></div>
+
     <video
       id="cam01-video"
-      class="viewport-video"
+      class="cctv-video-element"
       autoplay
       playsinline
       muted
       width="640"
       height="480"
     ></video>
+
     <canvas
       id="cam01-overlay-canvas"
-      class="viewport-canvas"
+      class="cctv-canvas-element"
       width="640"
       height="480"
-      aria-label="Visor óptico de la Cámara 01 con detección neuronal en vivo"
+      aria-label="Superposición de visión artificial con detección en vivo"
     ></canvas>
 
-    <div class="viewport-hud-bar">
-      <div class="hud-metric">
-        <span class="hud-label">Origen de captura:</span>
-        <span class="hud-value" id="hud-source-mode">Cámara local WebRTC</span>
+    <!-- HUD flotante semitransparente sobre el video -->
+    <div class="cctv-floating-hud">
+      <div class="hud-item">
+        <span class="hud-key">Diagnóstico:</span>
+        <strong class="hud-val hud-accent" id="hud-predicted-class">Conectando cámara...</strong>
       </div>
-      <div class="hud-metric">
-        <span class="hud-label">Evento detectado:</span>
-        <span class="hud-value" id="hud-predicted-class">Escena_Normal</span>
+      <div class="hud-item">
+        <span class="hud-key">Sujeto:</span>
+        <span class="hud-val" id="hud-subject-gender">--</span>
       </div>
-      <div class="hud-metric">
-        <span class="hud-label">Sujeto y género:</span>
-        <span class="hud-value" id="hud-subject-gender">No_Determinado</span>
-      </div>
-      <div class="hud-metric">
-        <span class="hud-label">Fotogramas evaluados:</span>
-        <span class="hud-value" id="hud-frame-count">0</span>
+      <div class="hud-item hud-hide-mobile">
+        <span class="hud-key">Frames:</span>
+        <span class="hud-val mono-stat" id="hud-frame-count">0</span>
       </div>
     </div>
   </div>
 
-  <div class="camera-controls-bar">
-    <div class="primary-camera-buttons">
-      <button type="button" class="btn-control btn-control-active" id="btn-start-webcam">
-        Conectar cámara web local
-      </button>
-      <button type="button" class="btn-control" id="btn-infer-once">
-        Analizar fotograma ahora
-      </button>
-      <button type="button" class="btn-control" id="btn-toggle-loop" data-running="true">
-        Pausar inferencia continua
-      </button>
+  <footer class="cctv-card-footer active-footer">
+    <div class="active-footer-info">
+      <span class="cctv-resolution" id="cam01-source-description">
+        {cam01.resolution} · Conexión automática activa
+      </span>
+      <span class="hud-subnote" id="hud-evidence-text">
+        Inferencia continua contra el motor de IA en localhost:8000
+      </span>
     </div>
 
-    <div class="autonomous-detection-banner">
-      <div class="detection-banner-content">
-        <span class="banner-badge">Detección 100% autónoma</span>
-        <p class="banner-text" id="hud-evidence-text">
-          Analizando video real en tiempo real: clasificación de escena Keras 3, detección de armas Torchvision, pose y género facial sobre CUDA.
-        </p>
-      </div>
+    <div class="active-footer-actions">
+      <button type="button" class="btn-hud-control" id="btn-infer-once" title="Evaluar frame actual inmediatamente">
+        Capturar ahora
+      </button>
+      <button type="button" class="btn-hud-control btn-hud-toggle" id="btn-toggle-loop" data-running="true">
+        Pausar
+      </button>
+      <button type="button" class="btn-hud-control" id="btn-start-webcam" title="Reiniciar cámara">
+        Reiniciar
+      </button>
     </div>
-  </div>
+  </footer>
 </article>

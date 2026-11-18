@@ -1,12 +1,11 @@
 ---
 /**
  * Main Entry Page: src/pages/index.astro
- * Integrates the SentinelCV Landing Page and the 6-Camera Surveillance Console
- * built with Clean Architecture and the Optical Control Room design system.
+ * SentinelCV - Professional Security Operations Center (SOC) Console.
+ * Real-time 6-camera surveillance grid with automated neural threat detection.
+ * Zero marketing filler, 100% operational monitoring.
  */
-import HeroLanding from '../presentation/HeroLanding.astro';
 import CameraGridConsole from '../presentation/CameraGridConsole.astro';
-import ArchitectureOverview from '../presentation/ArchitectureOverview.astro';
 import '../presentation/styles/control-room.css';
 ---
 
@@ -15,42 +14,102 @@ import '../presentation/styles/control-room.css';
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SentinelCV | Sistema de seguridad por visión artificial en Keras y Astro</title>
+    <title>SentinelCV | Centro de Control y Monitoreo de Seguridad</title>
     <meta
       name="description"
-      content="Plataforma de seguridad inteligente con grilla de 6 cámaras y clasificación neuronal en tiempo real para detectar hurto, agresiones, señales de auxilio (hombre/mujer) y armas."
+      content="Consola de monitoreo de seguridad multi-cámara con detección neuronal en tiempo real de armas, agresiones y señales de auxilio."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
   </head>
   <body>
-    <HeroLanding />
+    <!-- Barra Superior Táctica de Sala de Control -->
+    <header class="soc-topbar">
+      <div class="soc-brand">
+        <span class="soc-pulse-led" id="soc-status-led" aria-hidden="true"></span>
+        <div class="soc-title-wrap">
+          <h1 class="soc-title">SENTINEL·CV</h1>
+          <span class="soc-subtitle">OPERATIONS CENTER</span>
+        </div>
+      </div>
 
-    <main>
+      <div class="soc-center-metrics">
+        <!-- Reloj en vivo de consola -->
+        <div class="soc-clock-box">
+          <span class="soc-clock-label">HORA DEL SISTEMA</span>
+          <span class="soc-clock-time mono-stat" id="soc-live-clock">--:--:--</span>
+        </div>
+
+        <!-- Estado del Motor IA -->
+        <div class="soc-engine-pill" id="header-backend-status">
+          <span class="engine-dot" id="header-backend-dot"></span>
+          <span class="engine-label mono-stat" id="header-backend-text">Verificando :8000...</span>
+        </div>
+
+        <!-- Badge de Amenaza Global -->
+        <div class="soc-threat-badge" id="soc-global-threat-badge" data-threat="LOW">
+          <span class="threat-dot"></span>
+          <span class="threat-text" id="soc-threat-text">SISTEMA NORMAL</span>
+        </div>
+      </div>
+
+      <div class="soc-right-actions">
+        <span class="soc-cameras-count mono-stat">
+          <strong id="summary-active-cameras">1</strong>/6 ACTIVAS
+        </span>
+        <button type="button" class="btn-fullscreen-toggle" id="btn-fullscreen" title="Modo pantalla completa">
+          [ ] PANTALLA
+        </button>
+      </div>
+    </header>
+
+    <!-- Contenido Principal: Matriz de 6 Cámaras y Telemetría -->
+    <main class="soc-main-content">
       <CameraGridConsole />
-      <ArchitectureOverview />
     </main>
-
-    <footer class="site-footer">
-      <span>SentinelCV Sistema de seguridad inteligente basado en Keras 3 y TensorFlow</span>
-      <span class="mono-stat">
-        Topología: CAM-01 activa (WebRTC local) / CAM-02 a CAM-06 en servidor (Deshabilitadas temporalmente)
-      </span>
-    </footer>
 
     <script>
       import { bootstrapSecurityConsole } from '../presentation/consoleClientBootstrap';
 
+      // Conexión automática inmediata en cuanto carga el documento
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
           bootstrapSecurityConsole();
         });
       } else {
         bootstrapSecurityConsole();
+      }
+
+      // Reloj digital en vivo sincronizado
+      const clockEl = document.getElementById('soc-live-clock');
+      const updateClock = () => {
+        if (clockEl) {
+          const now = new Date();
+          clockEl.textContent = now.toLocaleTimeString('es-CO', {
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+          });
+        }
+      };
+      updateClock();
+      setInterval(updateClock, 1000);
+
+      // Pantalla completa
+      const fsBtn = document.getElementById('btn-fullscreen');
+      if (fsBtn) {
+        fsBtn.addEventListener('click', () => {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          } else {
+            document.exitFullscreen().catch(() => {});
+          }
+        });
       }
     </script>
   </body>

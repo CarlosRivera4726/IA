@@ -173,6 +173,57 @@ class KerasSecurityModelAdapter(ThreatClassifierPort):
 
         return {cls_name: float(probs[i]) for i, cls_name in enumerate(self._scene_classes)}
 
+    PERSON_MIN_SCORE = 0.80
+    PERSON_NMS_IOU = 0.30
+    PERSON_MIN_VISIBLE_KPS = 6
+    PERSON_MIN_AREA = 0.02  # fracción mínima del frame
+    PERSON_CONTAIN_THRESH = 0.80
+
+    def _filter_person_detections(
+        self, boxes, scores, kp_logits, target_w: int, target_h: int
+    ) -> List[int]:
+        """Devuelve los índices de detecciones de persona válidas (sin duplicados/ruido)."""
+        candidates: List[int] = []
+        for i in range(len(scores)):
+            if float(scores[i]) < self.PERSON_MIN_SCORE:
+                continue
+            b = boxes[i]
+            area = max(0.0, (b[2] - b[0]) / target_w) * max(0.0, (b[3] - b[1]) / target_h)
+            if area < self.PERSON_MIN_AREA:
+                continue
+            # Una persona real tiene varios keypoints con confianza (logit > 0 => p > 0.5)
+            if len(kp_logits) > i:
+                visible = int(np.sum(np.asarray(kp_logits[i]) > 0.0))
+                if visible < self.PERSON_MIN_VISIBLE_KPS:
+                    continue
+            candidates.append(i)
+
+        if not candidates:
+            return []
+
+        # NMS estricto
+        t_boxes = torch.tensor(boxes[candidates], dtype=torch.float32)
+        t_scores = torch.tensor(scores[candidates], dtype=torch.float32)
+        kept = torchvision.ops.nms(t_boxes, t_scores, self.PERSON_NMS_IOU).tolist()
+        kept_idx = [candidates[k] for k in kept]  # ordenado por score desc
+
+        # Supresión por contención: descartar cajas casi totalmente dentro de otra mejor
+        final: List[int] = []
+        for i in kept_idx:
+            bi = boxes[i]
+            ai = max(1e-6, (bi[2] - bi[0]) * (bi[3] - bi[1]))
+            contained = False
+            for j in final:
+                bj = boxes[j]
+                iw = max(0.0, min(bi[2], bj[2]) - max(bi[0], bj[0]))
+                ih = max(0.0, min(bi[3], bj[3]) - max(bi[1], bj[1]))
+                if (iw * ih) / ai >= self.PERSON_CONTAIN_THRESH:
+                    contained = True
+                    break
+            if not contained:
+                final.append(i)
+        return final
+
     def _estimate_pose_and_gender(
         self, img_pil: Image.Image
     ) -> List[DetectedPerson]:
@@ -196,12 +247,16 @@ class KerasSecurityModelAdapter(ThreatClassifierPort):
         boxes = out.get("boxes", torch.empty(0)).cpu().numpy()
         scores = out.get("scores", torch.empty(0)).cpu().numpy()
         keypoints = out.get("keypoints", torch.empty(0)).cpu().numpy()
+        kp_logits = out.get("keypoints_scores", torch.empty(0)).cpu().numpy()
+
+        # --- Filtro anti-ruido: confianza alta + NMS + validación de keypoints + contención ---
+        keep_idx = self._filter_person_detections(
+            boxes, scores, kp_logits, target_w, target_h
+        )
 
         track_counter = 1
-        for idx in range(len(scores)):
+        for idx in keep_idx:
             score = float(scores[idx])
-            if score < 0.58:
-                continue
 
             box = boxes[idx]
             # Normalizar bbox en rango 0.0 .. 1.0 [xmin, ymin, xmax, ymax]
@@ -218,7 +273,11 @@ class KerasSecurityModelAdapter(ThreatClassifierPort):
                 name = KEYPOINT_NAMES[k_idx] if k_idx < len(KEYPOINT_NAMES) else f"kp_{k_idx}"
                 norm_x = max(0.0, min(1.0, float(x / target_w)))
                 norm_y = max(0.0, min(1.0, float(y / target_h)))
-                kp_score = float(v)
+                # 'v' es solo flag de visibilidad; la confianza real es keypoints_scores (logit)
+                if len(kp_logits) > idx and k_idx < len(kp_logits[idx]):
+                    kp_score = float(1.0 / (1.0 + np.exp(-float(kp_logits[idx][k_idx]))))
+                else:
+                    kp_score = float(v)
                 kps_list.append(DetectedKeypoint(name=name, x=norm_x, y=norm_y, score=kp_score))
                 if name in ("nose", "left_eye", "right_eye"):
                     face_kps_scores.append(kp_score)

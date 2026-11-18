@@ -1,8 +1,8 @@
 ---
 /**
  * Presentation Component: DisabledServerCameraCard.astro
- * Represents one of the 5 remote server cameras (CAM-02 through CAM-06)
- * that communicate with the backend server and are temporarily disabled.
+ * Compact, authentic CCTV monitor card for server camera nodes (CAM-02 through CAM-06).
+ * Shows standby video feed placeholder, node ID, zone, and RTSP stream.
  */
 import type { CameraNode } from '../domain';
 
@@ -14,55 +14,47 @@ const { node } = Astro.props;
 ---
 
 <article
-  class="disabled-camera-card"
+  class="cctv-camera-card cctv-server-node"
   data-camera-id={node.camera_id}
   data-camera-status={node.status}
-  data-camera-active="false"
 >
-  <header class="disabled-card-header">
-    <div class="disabled-id-group">
-      <span class="status-led status-led-standby" aria-hidden="true"></span>
-      <span class="camera-code">{node.camera_id}</span>
-      <h4 class="disabled-camera-title">{node.location_zone}</h4>
+  <header class="cctv-card-header">
+    <div class="cctv-id-tag">
+      <span class="cctv-led cctv-led-standby" aria-hidden="true"></span>
+      <span class="cctv-code">{node.camera_id}</span>
+      <span class="cctv-zone-name">{node.location_zone}</span>
     </div>
-    <span class="operational-badge badge-disabled">Deshabilitada temporalmente</span>
+    <span class="cctv-badge-standby">Servidor Standby</span>
   </header>
 
-  <div class="disabled-viewport-placeholder">
-    <div class="placeholder-reticle">
-      <span class="placeholder-status-title">Canal de servidor en espera</span>
-      <p class="placeholder-status-copy" data-reason-for={node.camera_id}>
-        {node.status_reason}
-      </p>
+  <div class="cctv-viewport-box">
+    <div class="cctv-screen-raster">
+      <div class="cctv-scanline"></div>
+      <div class="cctv-reticle-center">
+        <span class="reticle-crosshair">+</span>
+        <span class="cctv-standby-label">Canal en espera de enlace</span>
+        <span class="cctv-rtsp-endpoint" data-endpoint-for={node.camera_id}>
+          {node.stream_endpoint}
+        </span>
+      </div>
+      <div class="cctv-screen-meta">
+        <span class="cctv-resolution">{node.resolution}</span>
+        <span class="cctv-fps-tag">0 FPS (Inactivo)</span>
+      </div>
     </div>
   </div>
 
-  <dl class="disabled-node-meta">
-    <div class="meta-pair">
-      <dt class="meta-term">Enlace de servidor</dt>
-      <dd class="meta-detail mono-stat" data-endpoint-for={node.camera_id}>
-        {node.stream_endpoint}
-      </dd>
-    </div>
-    <div class="meta-pair">
-      <dt class="meta-term">Modo de conexión</dt>
-      <dd class="meta-detail">Nodo remoto gestionado por servidor (:8000)</dd>
-    </div>
-    <div class="meta-pair">
-      <dt class="meta-term">Última consulta al servidor</dt>
-      <dd class="meta-detail mono-stat" data-last-sync-for={node.camera_id}>
-        Sincronizado al iniciar
-      </dd>
-    </div>
-  </dl>
-
-  <footer class="disabled-card-footer">
+  <footer class="cctv-card-footer">
+    <span class="cctv-status-note" data-reason-for={node.camera_id}>
+      {node.status_reason}
+    </span>
     <button
       type="button"
-      class="btn-verify-node"
+      class="btn-ping-node"
       data-verify-camera={node.camera_id}
+      title="Comprobar conexión con el servidor central"
     >
-      Comprobar enlace con el servidor
+      Verificar enlace
     </button>
   </footer>
 </article>
