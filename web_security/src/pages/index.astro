@@ -1,0 +1,57 @@
+---
+/**
+ * Main Entry Page: src/pages/index.astro
+ * Integrates the SentinelCV Landing Page and the 6-Camera Surveillance Console
+ * built with Clean Architecture and the Optical Control Room design system.
+ */
+import HeroLanding from '../presentation/HeroLanding.astro';
+import CameraGridConsole from '../presentation/CameraGridConsole.astro';
+import ArchitectureOverview from '../presentation/ArchitectureOverview.astro';
+import '../presentation/styles/control-room.css';
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SentinelCV | Sistema de seguridad por visión artificial en Keras y Astro</title>
+    <meta
+      name="description"
+      content="Plataforma de seguridad inteligente con grilla de 6 cámaras y clasificación neuronal en tiempo real para detectar hurto, agresiones, señales de auxilio (hombre/mujer) y armas."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <HeroLanding />
+
+    <main>
+      <CameraGridConsole />
+      <ArchitectureOverview />
+    </main>
+
+    <footer class="site-footer">
+      <span>SentinelCV Sistema de seguridad inteligente basado en Keras 3 y TensorFlow</span>
+      <span class="mono-stat">
+        Topología: CAM-01 activa (WebRTC local) / CAM-02 a CAM-06 en servidor (Deshabilitadas temporalmente)
+      </span>
+    </footer>
+
+    <script>
+      import { bootstrapSecurityConsole } from '../presentation/consoleClientBootstrap';
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+          bootstrapSecurityConsole();
+        });
+      } else {
+        bootstrapSecurityConsole();
+      }
+    </script>
+  </body>
+</html>

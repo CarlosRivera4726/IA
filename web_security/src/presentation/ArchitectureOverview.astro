@@ -1,0 +1,78 @@
+---
+/**
+ * Presentation Component: ArchitectureOverview.astro
+ * Explains the Clean Architecture layers and the Keras 3 / MobileNetV2 model integration.
+ */
+---
+
+<section class="architecture-section" id="arquitectura-limpia" aria-labelledby="arch-heading">
+  <div class="arch-header">
+    <h2 class="arch-title" id="arch-heading">
+      Arquitectura limpia e integración con el modelo compilado en Keras
+    </h2>
+    <p class="arch-intro">
+      Tanto el servidor de inferencia en Python como esta aplicación web en Astro están estructurados
+      en cuatro capas concéntricas con inversión de dependencias. El dominio y los casos de uso no
+      dependen de APIs del navegador ni del framework de interfaz.
+    </p>
+  </div>
+
+  <div class="arch-columns">
+    <article class="arch-card">
+      <h3 class="arch-card-title">Capa de dominio (src/domain)</h3>
+      <p class="arch-card-body">
+        Define las entidades inmutables del sistema: nodos de cámara, predicciones de amenaza,
+        cajas delimitadoras, niveles de severidad y la taxonomía canónica de siete clases. Declara
+        los puertos de entrada y salida sin acoplamiento a WebRTC ni HTTP.
+      </p>
+      <dl class="arch-spec-list">
+        <div class="arch-spec-row">
+          <dt>Contratos principales</dt>
+          <dd class="mono-stat">ICameraStreamPort, IInferenceApiPort</dd>
+        </div>
+        <div class="arch-spec-row">
+          <dt>Entidades clave</dt>
+          <dd class="mono-stat">CameraNode, ThreatPrediction, SecurityAlert</dd>
+        </div>
+      </dl>
+    </article>
+
+    <article class="arch-card">
+      <h3 class="arch-card-title">Capa de aplicación (src/application)</h3>
+      <p class="arch-card-body">
+        Orquesta la captura de fotogramas de la Cámara 01, ejecuta la evaluación de reglas de alerta
+        y controla el flujo de peticiones mediante un bloqueo Single-Flight para evitar saturación
+        de red cuando el clasificador neuronal procesa video continuo.
+      </p>
+      <dl class="arch-spec-list">
+        <div class="arch-spec-row">
+          <dt>Casos de uso</dt>
+          <dd class="mono-stat">MonitorActiveCameraUseCase, GetCameraGridUseCase</dd>
+        </div>
+        <div class="arch-spec-row">
+          <dt>Control de concurrencia</dt>
+          <dd class="mono-stat">InferenceLoopController (Single-Flight Lock)</dd>
+        </div>
+      </dl>
+    </article>
+
+    <article class="arch-card">
+      <h3 class="arch-card-title">Capa de infraestructura (src/infrastructure)</h3>
+      <p class="arch-card-body">
+        Implementa el adaptador de cámara local mediante WebRTC con sintetizador óptico de respaldo
+        en canvas de 224 por 224 píxeles, así como el cliente HTTP que consume el modelo compilado
+        en el puerto 8000.
+      </p>
+      <dl class="arch-spec-list">
+        <div class="arch-spec-row">
+          <dt>Adaptadores</dt>
+          <dd class="mono-stat">WebRtcCameraAdapter, HttpInferenceClient</dd>
+        </div>
+        <div class="arch-spec-row">
+          <dt>Endpoints consumidos</dt>
+          <dd class="mono-stat">POST /api/v1/infer, GET /api/v1/cameras</dd>
+        </div>
+      </dl>
+    </article>
+  </div>
+</section>

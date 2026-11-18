@@ -1,0 +1,72 @@
+---
+/**
+ * Presentation Component: CameraGridConsole.astro
+ * Complete 6-Camera Monitoring Console:
+ * - Camera 01: Active local webcam feed connected to the Keras model inference loop
+ * - Telemetry Panel: Softmax distribution across the 7 classes, gender/threat readout, and alert log
+ * - Cameras 02 to 06: Remote server camera nodes temporarily disabled
+ */
+import { DEFAULT_SIX_CAMERA_NODES } from '../domain';
+import ActiveCameraViewport from './ActiveCameraViewport.astro';
+import DisabledServerCameraCard from './DisabledServerCameraCard.astro';
+import ModelTelemetryPanel from './ModelTelemetryPanel.astro';
+
+const disabledServerCameras = DEFAULT_SIX_CAMERA_NODES.filter(
+  (node) => node.camera_id !== 'CAM-01'
+);
+---
+
+<section class="console-section" id="matriz-camaras" aria-labelledby="console-heading">
+  <div class="console-section-header">
+    <div class="console-heading-block">
+      <h2 class="console-heading" id="console-heading">
+        Matriz operativa de 6 cámaras de seguridad
+      </h2>
+      <p class="console-subheading">
+        La Cámara 01 procesa el video de este dispositivo en tiempo real hacia el modelo compilado en Keras.
+        Las Cámaras 02 a 06 mantienen comunicación de estado con el servidor central pero se encuentran
+        temporalmente deshabilitadas.
+      </p>
+    </div>
+
+    <div class="console-topology-summary">
+      <div class="topology-counter">
+        <span class="counter-label">Cámaras totales:</span>
+        <strong class="counter-value" id="summary-total-cameras">6</strong>
+      </div>
+      <div class="topology-counter">
+        <span class="counter-label">Activa en dispositivo:</span>
+        <strong class="counter-value counter-active" id="summary-active-cameras">1</strong>
+      </div>
+      <div class="topology-counter">
+        <span class="counter-label">Deshabilitadas en servidor:</span>
+        <strong class="counter-value counter-standby" id="summary-disabled-cameras">5</strong>
+      </div>
+      <button type="button" class="btn-sync-topology" id="btn-sync-cameras">
+        Sincronizar nodos con servidor
+      </button>
+    </div>
+  </div>
+
+  <div class="primary-monitoring-workspace">
+    <ActiveCameraViewport />
+    <ModelTelemetryPanel />
+  </div>
+
+  <div class="server-nodes-subsection">
+    <div class="server-nodes-header">
+      <h3 class="server-nodes-title">
+        Nodos remotos comunicados con el servidor (Cámaras 02 a 06 deshabilitadas temporalmente)
+      </h3>
+      <span class="server-nodes-status" id="server-nodes-sync-label">
+        Estado reportado por GET /api/v1/cameras
+      </span>
+    </div>
+
+    <div class="disabled-cameras-grid" role="list" aria-label="Cámaras de servidor temporalmente deshabilitadas">
+      {disabledServerCameras.map((cameraNode) => (
+        <DisabledServerCameraCard node={cameraNode} />
+      ))}
+    </div>
+  </div>
+</section>

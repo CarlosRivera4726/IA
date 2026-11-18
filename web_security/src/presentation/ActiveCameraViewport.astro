@@ -1,0 +1,94 @@
+---
+/**
+ * Presentation Component: ActiveCameraViewport.astro
+ * Displays Camera 01 (Active local device camera via WebRTC getUserMedia + neural inference overlay)
+ * Fully automatic detection: continuous real-time video frames sent to http://localhost:8000/api/v1/infer.
+ * Zero manual scenario buttons.
+ */
+import { DEFAULT_SIX_CAMERA_NODES } from '../domain';
+
+const cam01 = DEFAULT_SIX_CAMERA_NODES[0];
+---
+
+<article class="active-camera-panel" data-camera-id={cam01.camera_id} data-camera-status="ACTIVE">
+  <header class="camera-panel-header">
+    <div class="camera-title-group">
+      <div class="camera-id-row">
+        <span class="status-led status-led-active" aria-hidden="true"></span>
+        <span class="camera-code">{cam01.camera_id}</span>
+        <h3 class="camera-name">{cam01.label}</h3>
+      </div>
+      <p class="camera-zone-text" id="cam01-source-description">
+        {cam01.location_zone} ({cam01.resolution})
+      </p>
+    </div>
+
+    <div class="camera-live-badges">
+      <span class="operational-badge badge-active" id="cam01-operational-badge">
+        Activa en este dispositivo
+      </span>
+      <span class="mono-stat" id="cam01-fps-counter">Latencia: -- ms</span>
+    </div>
+  </header>
+
+  <div class="viewport-frame" id="cam01-viewport-container">
+    <video
+      id="cam01-video"
+      class="viewport-video"
+      autoplay
+      playsinline
+      muted
+      width="640"
+      height="480"
+    ></video>
+    <canvas
+      id="cam01-overlay-canvas"
+      class="viewport-canvas"
+      width="640"
+      height="480"
+      aria-label="Visor óptico de la Cámara 01 con detección neuronal en vivo"
+    ></canvas>
+
+    <div class="viewport-hud-bar">
+      <div class="hud-metric">
+        <span class="hud-label">Origen de captura:</span>
+        <span class="hud-value" id="hud-source-mode">Cámara local WebRTC</span>
+      </div>
+      <div class="hud-metric">
+        <span class="hud-label">Evento detectado:</span>
+        <span class="hud-value" id="hud-predicted-class">Escena_Normal</span>
+      </div>
+      <div class="hud-metric">
+        <span class="hud-label">Sujeto y género:</span>
+        <span class="hud-value" id="hud-subject-gender">No_Determinado</span>
+      </div>
+      <div class="hud-metric">
+        <span class="hud-label">Fotogramas evaluados:</span>
+        <span class="hud-value" id="hud-frame-count">0</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="camera-controls-bar">
+    <div class="primary-camera-buttons">
+      <button type="button" class="btn-control btn-control-active" id="btn-start-webcam">
+        Conectar cámara web local
+      </button>
+      <button type="button" class="btn-control" id="btn-infer-once">
+        Analizar fotograma ahora
+      </button>
+      <button type="button" class="btn-control" id="btn-toggle-loop" data-running="true">
+        Pausar inferencia continua
+      </button>
+    </div>
+
+    <div class="autonomous-detection-banner">
+      <div class="detection-banner-content">
+        <span class="banner-badge">Detección 100% autónoma</span>
+        <p class="banner-text" id="hud-evidence-text">
+          Analizando video real en tiempo real: clasificación de escena Keras 3, detección de armas Torchvision, pose y género facial sobre CUDA.
+        </p>
+      </div>
+    </div>
+  </div>
+</article>

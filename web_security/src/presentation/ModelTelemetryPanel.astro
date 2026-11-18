@@ -1,0 +1,106 @@
+---
+/**
+ * Presentation Component: ModelTelemetryPanel.astro
+ * Displays real-time inference outputs from http://localhost:8000/api/v1/infer:
+ * primary event, subject gender, threat level, class probability bars,
+ * detected persons/objects evidence, and chronological alert log.
+ */
+import { CANONICAL_DETECTION_CLASSES, DETECTION_CLASS_CATALOG } from '../domain';
+---
+
+<aside class="telemetry-panel" aria-label="Telemetría del clasificador neuronal">
+  <header class="telemetry-header">
+    <h3 class="telemetry-title">Lectura del clasificador neuronal</h3>
+    <span class="telemetry-model-tag" id="telemetry-model-name">
+      SentinelCV-Keras3 + Torchvision
+    </span>
+  </header>
+
+  <div class="prediction-readout-card" id="prediction-readout-card" data-threat-level="LOW">
+    <div class="readout-primary-row">
+      <div class="readout-class-group">
+        <span class="readout-caption">Diagnóstico autónomo en Cámara 01</span>
+        <strong class="readout-class-title" id="readout-readable-class">
+          Escena normal sin incidentes
+        </strong>
+        <span class="readout-canonical-key" id="readout-canonical-key">Escena_Normal</span>
+      </div>
+      <div class="readout-confidence-box">
+        <span class="readout-caption">Confianza</span>
+        <strong class="readout-confidence-number" id="readout-confidence-pct">--%</strong>
+      </div>
+    </div>
+
+    <dl class="readout-attributes-grid">
+      <div class="attr-item">
+        <dt class="attr-label">Sujeto y género</dt>
+        <dd class="attr-value" id="readout-subject-gender">No_Determinado</dd>
+      </div>
+      <div class="attr-item">
+        <dt class="attr-label">Nivel de amenaza</dt>
+        <dd class="attr-value" id="readout-threat-level">Bajo (Escena segura)</dd>
+      </div>
+      <div class="attr-item">
+        <dt class="attr-label">Latencia de inferencia</dt>
+        <dd class="attr-value" id="readout-latency-ms">-- ms</dd>
+      </div>
+      <div class="attr-item">
+        <dt class="attr-label">Control Single-Flight</dt>
+        <dd class="attr-value" id="readout-backpressure-stat">0 omitidos</dd>
+      </div>
+    </dl>
+
+    <div class="readout-evidence-box">
+      <span class="evidence-caption">Evidencia temporal:</span>
+      <p class="readout-protocol-text" id="readout-protocol-text">
+        Esperando flujo de video de la cámara...
+      </p>
+    </div>
+  </div>
+
+  <section class="probabilities-section" aria-label="Distribución de probabilidades por clase">
+    <div class="section-subhead">
+      <h4 class="subhead-title">Vector de probabilidad por evento</h4>
+      <span class="subhead-meta">Suma normalizada 1.00</span>
+    </div>
+
+    <div class="prob-bars-list">
+      {CANONICAL_DETECTION_CLASSES.map((clsKey) => {
+        const desc = DETECTION_CLASS_CATALOG[clsKey];
+        const initialPct = clsKey === 'Escena_Normal' ? 95.0 : 0.8;
+        return (
+          <div class="prob-bar-item" data-prob-row={clsKey}>
+            <div class="prob-bar-labels">
+              <span class="prob-label-name">{desc.readableLabel}</span>
+              <span class="prob-label-value" data-prob-value={clsKey}>
+                {initialPct.toFixed(1)}%
+              </span>
+            </div>
+            <div class="prob-track">
+              <div
+                class="prob-fill"
+                data-prob-fill={clsKey}
+                style={`width: ${initialPct}%;`}
+              ></div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </section>
+
+  <section class="alerts-log-section" aria-label="Registro cronológico de alertas">
+    <div class="section-subhead">
+      <h4 class="subhead-title">Registro de eventos detectados</h4>
+      <button type="button" class="btn-clear-log" id="btn-clear-alerts">
+        Limpiar historial
+      </button>
+    </div>
+
+    <ul class="alerts-list" id="security-alert-log">
+      <li class="alert-empty-state" id="alert-empty-item">
+        No se registran incidentes críticos. El sistema analiza continuamente el video de la cámara web física en busca de armas, agresiones o gestos de auxilio.
+      </li>
+    </ul>
+  </section>
+</aside>

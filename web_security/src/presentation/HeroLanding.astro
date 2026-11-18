@@ -1,0 +1,107 @@
+---
+/**
+ * Presentation Component: HeroLanding.astro
+ * Executive introduction to SentinelCV grounded in optical control room instrumentation.
+ * Strictly adheres to frontend-design: sentence case, active verbs, no uppercase eyebrows,
+ * no middle dots, no em-dashes, no button arrows, no single-word color highlights.
+ */
+import { CANONICAL_DETECTION_CLASSES, DETECTION_CLASS_CATALOG } from '../domain';
+---
+
+<header class="site-topbar">
+  <div class="topbar-inner">
+    <div class="brand-block">
+      <span class="status-led status-led-active" aria-hidden="true"></span>
+      <span class="brand-name">SentinelCV</span>
+      <span class="brand-subtitle">Visión artificial aplicada a seguridad física</span>
+    </div>
+
+    <nav class="topbar-nav" aria-label="Navegación principal">
+      <a href="#matriz-camaras" class="nav-link">Matriz de 6 cámaras</a>
+      <a href="#clases-deteccion" class="nav-link">Clases neuronales</a>
+      <a href="#arquitectura-limpia" class="nav-link">Arquitectura del sistema</a>
+    </nav>
+
+    <div class="engine-pill" id="header-backend-status">
+      <span class="engine-dot" id="header-backend-dot"></span>
+      <span class="engine-label" id="header-backend-text">Verificando motor Keras en localhost:8000</span>
+    </div>
+  </div>
+</header>
+
+<section class="hero-chassis">
+  <div class="hero-grid">
+    <div class="hero-copy-column">
+      <p class="context-note">Plataforma de videovigilancia neuronal con Keras y TensorFlow</p>
+      <h1 class="hero-title">
+        Supervisión óptica en tiempo real para detectar amenazas críticas antes de que escalen
+      </h1>
+      <p class="hero-description">
+        SentinelCV analiza el flujo de video mediante redes neuronales convolucionales compiladas en Keras 3.
+        Identifica agresiones con arma blanca o de fuego, ataques físicos, posibles hurtos y señales de auxilio
+        emitidas por mujeres u hombres directamente hacia la cámara.
+      </p>
+
+      <div class="hero-actions">
+        <a href="#matriz-camaras" class="btn-primary">Abrir consola de 6 cámaras</a>
+        <button type="button" class="btn-secondary" id="hero-activate-cam-btn">
+          Activar cámara de este dispositivo
+        </button>
+      </div>
+
+      <dl class="hero-specs-table">
+        <div class="spec-cell">
+          <dt class="spec-term">Topología de red</dt>
+          <dd class="spec-value">6 nodos (1 cámara local activa y 5 nodos de servidor en espera)</dd>
+        </div>
+        <div class="spec-cell">
+          <dt class="spec-term">Motor de inferencia</dt>
+          <dd class="spec-value">Modelo compilado .keras expuesto en API HTTP puerto 8000</dd>
+        </div>
+        <div class="spec-cell">
+          <dt class="spec-term">Control de red</dt>
+          <dd class="spec-value">Bloqueo Single-Flight con tensores de 224 por 224 píxeles</dd>
+        </div>
+      </dl>
+    </div>
+
+    <div class="hero-catalog-column" id="clases-deteccion">
+      <div class="catalog-header">
+        <h2 class="catalog-title">Taxonomía de 7 clases del modelo compilado</h2>
+        <p class="catalog-subtitle">
+          Cada fotograma capturado en la Cámara 01 se evalúa contra siete categorías entrenadas sin fuga de datos.
+        </p>
+      </div>
+
+      <div class="class-table" role="table" aria-label="Clases de detección del modelo de inteligencia artificial">
+        {CANONICAL_DETECTION_CLASSES.map((classKey) => {
+          const item = DETECTION_CLASS_CATALOG[classKey];
+          const severityClass =
+            item.defaultThreatLevel === 'CRITICAL'
+              ? 'severity-critical'
+              : item.defaultThreatLevel === 'HIGH'
+                ? 'severity-high'
+                : 'severity-low';
+          const severityLabel =
+            item.defaultThreatLevel === 'CRITICAL'
+              ? 'Crítico'
+              : item.defaultThreatLevel === 'HIGH'
+                ? 'Alto'
+                : 'Normal';
+          return (
+            <div class="class-row" role="row">
+              <div class="class-cell-main" role="cell">
+                <span class="class-readable-name">{item.readableLabel}</span>
+                <span class="class-key-code">{item.key}</span>
+              </div>
+              <div class="class-cell-meta" role="cell">
+                <span class="class-gender-tag">Sujeto: {item.defaultGender}</span>
+                <span class={`class-severity-badge ${severityClass}`}>{severityLabel}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,99 @@
+# ========================================================
+# .gitignore para SentinelCV (IA + Keras + Astro Web)
+# ========================================================
+
+# --- Pesos Grandes y Checkpoints de PyTorch / Torchvision ---
+# Los checkpoints de Keypoint R-CNN y Faster R-CNN pesan > 200 MB (superan el limite de 100 MB de GitHub)
+.torch/
+torch_checkpoints/
+*.pth
+*.pt
+*.bin
+*.onnx
+
+# --- Cache de Keras y Kaggle ---
+.keras/
+.cache/
+kagglehub/
+
+# --- Datasets de Imagenes Masivas ---
+# Las carpetas de imagenes no deben subirse al repositorio (se regeneran con prepare_real_datasets.py)
+datasets/sentinel_real_dataset/
+datasets/gender_real_dataset/
+datasets/holdout/
+datasets/*.zip
+datasets/*.tar.gz
+*.jpg
+*.jpeg
+*.png
+
+# --- Dependencias y Builds de Frontend Web (Astro / Node / Bun) ---
+web_security/node_modules/
+web_security/dist/
+web_security/.astro/
+web_security/.bun_tmp/
+web_security/.bun_cache/
+.npm/
+.yarn/
+.pnpm-store/
+
+# --- Entornos Virtuales de Python y Cache ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.env.local
+.env.*.local
+venv/
+.venv/
+env/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# --- Jupyter Notebooks Cache ---
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# --- Logs y Pruebas ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Archivos del Sistema Operativo ---
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# --- IDEs y Editores ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
