@@ -1,4 +1,4 @@
-"""
+﻿"""
 Adaptador de Infraestructura para el pipeline de visión artificial SentinelCV v2:
 - Carga models/sentinel_security_model.keras (Clasificador de escena Keras 3 / PyTorch CUDA)
 - Carga models/sentinel_gender_model.keras (Clasificador facial de género Keras 3)
@@ -173,11 +173,11 @@ class KerasSecurityModelAdapter(ThreatClassifierPort):
 
         return {cls_name: float(probs[i]) for i, cls_name in enumerate(self._scene_classes)}
 
-    PERSON_MIN_SCORE = 0.80
-    PERSON_NMS_IOU = 0.30
-    PERSON_MIN_VISIBLE_KPS = 6
-    PERSON_MIN_AREA = 0.02  # fracción mínima del frame
-    PERSON_CONTAIN_THRESH = 0.80
+    PERSON_MIN_SCORE = 0.65
+    PERSON_NMS_IOU = 0.45
+    PERSON_MIN_VISIBLE_KPS = 3
+    PERSON_MIN_AREA = 0.01  # fracción mínima del frame
+    PERSON_CONTAIN_THRESH = 0.90
 
     def _filter_person_detections(
         self, boxes, scores, kp_logits, target_w: int, target_h: int
@@ -279,7 +279,7 @@ class KerasSecurityModelAdapter(ThreatClassifierPort):
                 else:
                     kp_score = float(v)
                 kps_list.append(DetectedKeypoint(name=name, x=norm_x, y=norm_y, score=kp_score))
-                if name in ("nose", "left_eye", "right_eye"):
+                if name in ("nose", "left_eye", "right_eye", "left_ear", "right_ear"):
                     face_kps_scores.append(kp_score)
 
             # Clasificar género facial usando Face ROI
@@ -288,7 +288,7 @@ class KerasSecurityModelAdapter(ThreatClassifierPort):
 
             # Solo predecir género si los keypoints faciales son claramente visibles (score >= 0.40)
             avg_face_score = float(np.mean(face_kps_scores)) if face_kps_scores else 0.0
-            if avg_face_score >= 0.40 and self._gender_model is not None:
+            if avg_face_score >= 0.15 and self._gender_model is not None:
                 # Recorte facial alrededor de la cabeza
                 head_w = max(0.12, (xmax - xmin) * 0.6)
                 head_h = max(0.14, (ymax - ymin) * 0.35)
@@ -488,3 +488,4 @@ class KerasSecurityModelAdapter(ThreatClassifierPort):
             "gender_classes": self._gender_classes,
             "metrics": self._metadata.get("scene_champion", {}),
         }
+
