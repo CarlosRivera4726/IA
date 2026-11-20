@@ -1,8 +1,8 @@
 ---
 /**
  * Presentation Component: DisabledServerCameraCard.astro
- * Compact, authentic CCTV monitor card for server camera nodes (CAM-02 through CAM-06).
- * Shows standby video feed placeholder, node ID, zone, and RTSP stream.
+ * Quiet, honest standby monitor bay for server camera channels (CAM-02 through CAM-06).
+ * Free of artificial scanlines or decorative reticles.
  */
 import type { CameraNode } from '../domain';
 
@@ -14,47 +14,49 @@ const { node } = Astro.props;
 ---
 
 <article
-  class="cctv-camera-card cctv-server-node"
+  class="camera-monitor camera-monitor-standby"
   data-camera-id={node.camera_id}
   data-camera-status={node.status}
 >
-  <header class="cctv-card-header">
-    <div class="cctv-id-tag">
-      <span class="cctv-led cctv-led-standby" aria-hidden="true"></span>
-      <span class="cctv-code">{node.camera_id}</span>
-      <span class="cctv-zone-name">{node.location_zone}</span>
+  <header class="monitor-header">
+    <div class="monitor-identity">
+      <span class="tally-dot tally-standby" aria-hidden="true"></span>
+      <span class="monitor-code mono-stat">{node.camera_id}</span>
+      <span class="monitor-zone">{node.location_zone}</span>
     </div>
-    <span class="cctv-badge-standby">Servidor Standby</span>
+    <span class="monitor-state-standby">En espera</span>
   </header>
 
-  <div class="cctv-viewport-box">
-    <div class="cctv-screen-raster">
-      <div class="cctv-scanline"></div>
-      <div class="cctv-reticle-center">
-        <span class="reticle-crosshair">+</span>
-        <span class="cctv-standby-label">Canal en espera de enlace</span>
-        <span class="cctv-rtsp-endpoint" data-endpoint-for={node.camera_id}>
-          {node.stream_endpoint}
-        </span>
-      </div>
-      <div class="cctv-screen-meta">
-        <span class="cctv-resolution">{node.resolution}</span>
-        <span class="cctv-fps-tag">0 FPS (Inactivo)</span>
-      </div>
+  <div class="monitor-stage standby-stage">
+    <div class="standby-body">
+      <svg class="standby-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <rect x="2" y="5" width="11.5" height="10" rx="1.4" stroke="currentColor" stroke-width="1.3" />
+        <path d="M13.5 8.2L18 5.8V14.2L13.5 11.8" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+        <line x1="2.5" y1="16.5" x2="15.5" y2="3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+      </svg>
+      <span class="standby-title">Sin señal del servidor</span>
+      <span class="standby-endpoint mono-stat" data-endpoint-for={node.camera_id}>
+        {node.stream_endpoint}
+      </span>
+    </div>
+
+    <div class="standby-corner-meta mono-stat">
+      <span>{node.resolution}</span>
+      <span>0 fps</span>
     </div>
   </div>
 
-  <footer class="cctv-card-footer">
-    <span class="cctv-status-note" data-reason-for={node.camera_id}>
+  <footer class="monitor-footer standby-footer">
+    <span class="standby-reason" data-reason-for={node.camera_id} title={node.status_reason}>
       {node.status_reason}
     </span>
     <button
       type="button"
-      class="btn-ping-node"
+      class="btn-verify-channel"
       data-verify-camera={node.camera_id}
-      title="Comprobar conexión con el servidor central"
+      title={`Comprobar enlace de ${node.camera_id}`}
     >
-      Verificar enlace
+      Verificar
     </button>
   </footer>
 </article>

@@ -1,36 +1,33 @@
 ---
 /**
  * Presentation Component: ActiveCameraViewport.astro
- * High-end CCTV operator viewport for Camera 01 (Local webcam).
- * Real-time video with transparent canvas neural HUD overlay.
- * 100% automatic live detection.
+ * Unobstructed primary operator monitor for Camera 01 (local webcam).
+ * Clean integrated header and operator control strip without floating overlays blocking video.
  */
 import { DEFAULT_SIX_CAMERA_NODES } from '../domain';
 
 const cam01 = DEFAULT_SIX_CAMERA_NODES[0];
 ---
 
-<article class="cctv-camera-card cctv-active-node" data-camera-id={cam01.camera_id} data-camera-status="ACTIVE">
-  <header class="cctv-card-header">
-    <div class="cctv-id-tag">
-      <span class="cctv-led cctv-led-active" id="cam01-pulse-led" aria-hidden="true"></span>
-      <span class="cctv-code">{cam01.camera_id}</span>
-      <span class="cctv-zone-name">{cam01.location_zone}</span>
+<article
+  class="camera-monitor camera-monitor-active"
+  data-camera-id={cam01.camera_id}
+  data-camera-status="ACTIVE"
+>
+  <header class="monitor-header">
+    <div class="monitor-identity">
+      <span class="tally-dot tally-live" id="cam01-pulse-led" aria-hidden="true"></span>
+      <span class="monitor-code mono-stat">{cam01.camera_id}</span>
+      <span class="monitor-zone">{cam01.location_zone}</span>
     </div>
 
-    <div class="cctv-header-metrics">
-      <span class="cctv-badge-live" id="cam01-operational-badge">LIVE · EN VIVO</span>
-      <span class="mono-stat cctv-latency" id="cam01-fps-counter">-- ms</span>
+    <div class="monitor-header-meta">
+      <span class="monitor-state-live" id="cam01-operational-badge">En vivo</span>
+      <span class="monitor-latency mono-stat" id="cam01-fps-counter">-- ms</span>
     </div>
   </header>
 
-  <div class="cctv-viewport-box active-viewport-box" id="cam01-viewport-container">
-    <!-- Esquinas tácticas de calibración -->
-    <div class="cctv-bracket bracket-tl" aria-hidden="true"></div>
-    <div class="cctv-bracket bracket-tr" aria-hidden="true"></div>
-    <div class="cctv-bracket bracket-bl" aria-hidden="true"></div>
-    <div class="cctv-bracket bracket-br" aria-hidden="true"></div>
-
+  <div class="monitor-stage active-stage" id="cam01-viewport-container">
     <video
       id="cam01-video"
       class="cctv-video-element"
@@ -46,44 +43,58 @@ const cam01 = DEFAULT_SIX_CAMERA_NODES[0];
       class="cctv-canvas-element"
       width="640"
       height="480"
-      aria-label="Superposición de visión artificial con detección en vivo"
+      aria-label="Superposición de detección sobre el flujo de video en vivo"
     ></canvas>
+  </div>
 
-    <!-- HUD flotante semitransparente sobre el video -->
-    <div class="cctv-floating-hud">
-      <div class="hud-item">
-        <span class="hud-key">Diagnóstico:</span>
-        <strong class="hud-val hud-accent" id="hud-predicted-class">Conectando cámara...</strong>
+  <div class="monitor-live-strip" aria-live="polite">
+    <div class="live-strip-primary">
+      <strong class="live-diagnosis" id="hud-predicted-class">Conectando cámara...</strong>
+      <span class="live-evidence-inline" id="hud-evidence-text">
+        Esperando fotogramas del dispositivo local
+      </span>
+    </div>
+
+    <div class="live-strip-metrics">
+      <div class="inline-datum">
+        <span class="datum-label">Sujeto</span>
+        <span class="datum-value" id="hud-subject-gender">Sin detectar</span>
       </div>
-      <div class="hud-item">
-        <span class="hud-key">Sujeto:</span>
-        <span class="hud-val" id="hud-subject-gender">--</span>
-      </div>
-      <div class="hud-item hud-hide-mobile">
-        <span class="hud-key">Frames:</span>
-        <span class="hud-val mono-stat" id="hud-frame-count">0</span>
+      <div class="inline-datum">
+        <span class="datum-label">Fotogramas</span>
+        <span class="datum-value mono-stat" id="hud-frame-count">0</span>
       </div>
     </div>
   </div>
 
-  <footer class="cctv-card-footer active-footer">
-    <div class="active-footer-info">
-      <span class="cctv-resolution" id="cam01-source-description">
-        {cam01.resolution} · Conexión automática activa
-      </span>
-      <span class="hud-subnote" id="hud-evidence-text">
-        Inferencia continua contra el motor de IA en localhost:8000
-      </span>
-    </div>
+  <footer class="monitor-footer active-footer">
+    <span class="monitor-source-info" id="cam01-source-description">
+      Cámara local en {cam01.resolution}
+    </span>
 
-    <div class="active-footer-actions">
-      <button type="button" class="btn-hud-control" id="btn-infer-once" title="Evaluar frame actual inmediatamente">
-        Capturar ahora
+    <div class="monitor-controls">
+      <button
+        type="button"
+        class="btn-monitor"
+        id="btn-infer-once"
+        title="Evaluar fotograma actual inmediatamente"
+      >
+        Capturar
       </button>
-      <button type="button" class="btn-hud-control btn-hud-toggle" id="btn-toggle-loop" data-running="true">
+      <button
+        type="button"
+        class="btn-monitor btn-monitor-toggle"
+        id="btn-toggle-loop"
+        data-running="true"
+      >
         Pausar
       </button>
-      <button type="button" class="btn-hud-control" id="btn-start-webcam" title="Reiniciar cámara">
+      <button
+        type="button"
+        class="btn-monitor"
+        id="btn-start-webcam"
+        title="Reconectar cámara del dispositivo"
+      >
         Reiniciar
       </button>
     </div>

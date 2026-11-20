@@ -1,9 +1,7 @@
 ---
 /**
  * Main Entry Page: src/pages/index.astro
- * SentinelCV - Professional Security Operations Center (SOC) Console.
- * Real-time 6-camera surveillance grid with automated neural threat detection.
- * Zero marketing filler, 100% operational monitoring.
+ * SentinelCV — Consola profesional de videovigilancia y analítica de seguridad.
  */
 import CameraGridConsole from '../presentation/CameraGridConsole.astro';
 import '../presentation/styles/control-room.css';
@@ -14,68 +12,81 @@ import '../presentation/styles/control-room.css';
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SentinelCV | Centro de Control y Monitoreo de Seguridad</title>
+    <title>SentinelCV | Consola de videovigilancia</title>
     <meta
       name="description"
-      content="Consola de monitoreo de seguridad multi-cámara con detección neuronal en tiempo real de armas, agresiones y señales de auxilio."
+      content="Consola de monitoreo de seguridad multi-cámara con detección en tiempo real de amenazas, armas, agresiones y señales de auxilio."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap"
       rel="stylesheet"
     />
   </head>
   <body>
-    <!-- Barra Superior Táctica de Sala de Control -->
-    <header class="soc-topbar">
-      <div class="soc-brand">
-        <span class="soc-pulse-led" id="soc-status-led" aria-hidden="true"></span>
-        <div class="soc-title-wrap">
-          <h1 class="soc-title">SENTINEL·CV</h1>
-          <span class="soc-subtitle">OPERATIONS CENTER</span>
-        </div>
-      </div>
-
-      <div class="soc-center-metrics">
-        <!-- Reloj en vivo de consola -->
-        <div class="soc-clock-box">
-          <span class="soc-clock-label">HORA DEL SISTEMA</span>
-          <span class="soc-clock-time mono-stat" id="soc-live-clock">--:--:--</span>
-        </div>
-
-        <!-- Estado del Motor IA -->
-        <div class="soc-engine-pill" id="header-backend-status">
-          <span class="engine-dot" id="header-backend-dot"></span>
-          <span class="engine-label mono-stat" id="header-backend-text">Verificando :8000...</span>
-        </div>
-
-        <!-- Badge de Amenaza Global -->
-        <div class="soc-threat-badge" id="soc-global-threat-badge" data-threat="LOW">
-          <span class="threat-dot"></span>
-          <span class="threat-text" id="soc-threat-text">SISTEMA NORMAL</span>
-        </div>
-      </div>
-
-      <div class="soc-right-actions">
-        <span class="soc-cameras-count mono-stat">
-          <strong id="summary-active-cameras">1</strong>/6 ACTIVAS
+    <header class="vms-topbar">
+      <div class="vms-brand">
+        <span class="vms-logo-mark" id="soc-status-led" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <rect x="1.5" y="1.5" width="15" height="15" rx="2" stroke="currentColor" stroke-width="1.4" />
+            <circle cx="9" cy="9" r="3.2" stroke="currentColor" stroke-width="1.4" />
+            <circle cx="9" cy="9" r="1" fill="currentColor" />
+          </svg>
         </span>
-        <button type="button" class="btn-fullscreen-toggle" id="btn-fullscreen" title="Modo pantalla completa">
-          [ ] PANTALLA
+        <div class="vms-brand-text">
+          <h1 class="vms-brand-name">SentinelCV</h1>
+          <span class="vms-brand-divider" aria-hidden="true"></span>
+          <span class="vms-brand-scope">Consola de monitoreo</span>
+        </div>
+      </div>
+
+      <div class="vms-status-strip">
+        <div class="vms-threat-status" id="soc-global-threat-badge" data-threat="LOW">
+          <span class="status-indicator-dot" aria-hidden="true"></span>
+          <span class="status-text" id="soc-threat-text">Normal</span>
+        </div>
+
+        <span class="vms-strip-sep" aria-hidden="true"></span>
+
+        <div class="vms-engine-status" id="header-backend-status">
+          <span class="engine-dot" id="header-backend-dot" aria-hidden="true"></span>
+          <span class="engine-label" id="header-backend-text">Verificando motor local</span>
+        </div>
+
+        <span class="vms-strip-sep" aria-hidden="true"></span>
+
+        <div class="vms-channel-summary">
+          <span class="mono-stat"><strong id="summary-active-cameras">1</strong>/6</span>
+          <span class="channel-summary-label">canales activos</span>
+        </div>
+
+        <span class="vms-strip-sep" aria-hidden="true"></span>
+
+        <time class="vms-clock mono-stat" id="soc-live-clock" aria-label="Hora local del sistema">--:--:--</time>
+
+        <button
+          type="button"
+          class="vms-icon-btn"
+          id="btn-fullscreen"
+          title="Alternar pantalla completa"
+          aria-label="Alternar pantalla completa"
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M2.5 6V2.5H6M10 2.5H13.5V6M13.5 10V13.5H10M6 13.5H2.5V10" stroke="currentColor" stroke-width="1.4" stroke-linecap="square" />
+          </svg>
+          <span>Pantalla completa</span>
         </button>
       </div>
     </header>
 
-    <!-- Contenido Principal: Matriz de 6 Cámaras y Telemetría -->
-    <main class="soc-main-content">
+    <main class="vms-workspace">
       <CameraGridConsole />
     </main>
 
     <script>
       import { bootstrapSecurityConsole } from '../presentation/consoleClientBootstrap';
 
-      // Conexión automática inmediata en cuanto carga el documento
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
           bootstrapSecurityConsole();
@@ -84,7 +95,6 @@ import '../presentation/styles/control-room.css';
         bootstrapSecurityConsole();
       }
 
-      // Reloj digital en vivo sincronizado
       const clockEl = document.getElementById('soc-live-clock');
       const updateClock = () => {
         if (clockEl) {
@@ -100,9 +110,14 @@ import '../presentation/styles/control-room.css';
       updateClock();
       setInterval(updateClock, 1000);
 
-      // Pantalla completa
       const fsBtn = document.getElementById('btn-fullscreen');
       if (fsBtn) {
+        const updateFsLabel = () => {
+          const labelSpan = fsBtn.querySelector('span');
+          if (labelSpan) {
+            labelSpan.textContent = document.fullscreenElement ? 'Salir' : 'Pantalla completa';
+          }
+        };
         fsBtn.addEventListener('click', () => {
           if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(() => {});
@@ -110,7 +125,24 @@ import '../presentation/styles/control-room.css';
             document.exitFullscreen().catch(() => {});
           }
         });
+        document.addEventListener('fullscreenchange', updateFsLabel);
       }
+
+      // Selector de distribución del muro de video (Principal 1+5 | Rejilla 3x2 | Enfoque)
+      const gridEl = document.getElementById('cctv-six-grid');
+      const layoutButtons = document.querySelectorAll<HTMLButtonElement>('[data-layout-mode]');
+      layoutButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const mode = btn.getAttribute('data-layout-mode');
+          if (!gridEl || !mode) return;
+          gridEl.setAttribute('data-layout', mode);
+          layoutButtons.forEach((b) => {
+            const isActive = b === btn;
+            b.classList.toggle('is-active', isActive);
+            b.setAttribute('aria-pressed', String(isActive));
+          });
+        });
+      });
     </script>
   </body>
 </html>

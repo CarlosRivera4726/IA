@@ -1,74 +1,80 @@
 ---
 /**
  * Presentation Component: ModelTelemetryPanel.astro
- * High-density real-time telemetry panel for AI inference.
- * Displays predicted event, threat level, confidence, class probabilities, and live alert feed.
+ * Docked right-hand operational inspector for Camera 01 inference telemetry,
+ * 7-class probability distribution, and chronological incident log.
  */
 import { CANONICAL_DETECTION_CLASSES, DETECTION_CLASS_CATALOG } from '../domain';
 ---
 
-<aside class="telemetry-panel" aria-label="Telemetría de visión artificial">
-  <header class="telemetry-header">
-    <div class="telemetry-title-wrap">
-      <h3 class="telemetry-title">Telemetría de IA</h3>
-      <span class="telemetry-chip-ai" id="telemetry-model-name">Keras 3 + PyTorch CUDA</span>
+<aside class="inspector-rail" aria-label="Inspector de detección y telemetría">
+  <header class="inspector-section inspector-header">
+    <div class="inspector-header-main">
+      <h2 class="inspector-title">Análisis en vivo</h2>
+      <span class="inspector-engine-meta" id="telemetry-model-name">Cámara 01</span>
     </div>
-    <span class="telemetry-live-dot" title="Recibiendo datos continuos"></span>
   </header>
 
-  <!-- Tarjeta de diagnóstico principal -->
-  <div class="prediction-readout-card" id="prediction-readout-card" data-threat-level="LOW">
-    <div class="readout-hero">
-      <span class="readout-label">Evento en Cámara 01</span>
-      <h4 class="readout-event-name" id="readout-readable-class">Iniciando...</h4>
-      <span class="readout-key-tag mono-stat" id="readout-canonical-key">Escena_Normal</span>
-    </div>
-
-    <div class="readout-score-box">
-      <span class="readout-score-title">Confianza</span>
-      <strong class="readout-score-pct mono-stat" id="readout-confidence-pct">--%</strong>
-    </div>
-
-    <div class="readout-stats-row">
-      <div class="stat-pill">
-        <span class="stat-k">Sujeto:</span>
-        <strong class="stat-v" id="readout-subject-gender">--</strong>
+  <section
+    class="inspector-section readout-block"
+    id="prediction-readout-card"
+    data-threat-level="LOW"
+    aria-label="Diagnóstico actual de Cámara 01"
+  >
+    <div class="readout-headline-row">
+      <div class="readout-headline-text">
+        <h3 class="readout-event-name" id="readout-readable-class">Iniciando monitoreo</h3>
+        <span class="readout-key-tag mono-stat" id="readout-canonical-key">Escena_Normal</span>
       </div>
-      <div class="stat-pill">
-        <span class="stat-k">Amenaza:</span>
-        <strong class="stat-v" id="readout-threat-level">Bajo</strong>
-      </div>
-      <div class="stat-pill">
-        <span class="stat-k">Latencia:</span>
-        <strong class="stat-v mono-stat" id="readout-latency-ms">-- ms</strong>
-      </div>
-      <div class="stat-pill stat-hide">
-        <span class="stat-k">Omitidos:</span>
-        <strong class="stat-v mono-stat" id="readout-backpressure-stat">0</strong>
+      <div class="readout-confidence-wrap">
+        <strong class="readout-score-pct mono-stat" id="readout-confidence-pct">--%</strong>
+        <span class="readout-score-caption">Confianza</span>
       </div>
     </div>
 
-    <div class="readout-evidence-line">
-      <span class="evidence-prefix">Evidencia:</span>
-      <span class="evidence-body" id="readout-protocol-text">Conectando con el motor neuronal en localhost:8000...</span>
-    </div>
-  </div>
+    <dl class="telemetry-kv-grid">
+      <div class="kv-cell">
+        <dt class="kv-label">Sujeto</dt>
+        <dd class="kv-value" id="readout-subject-gender">Sin detectar</dd>
+      </div>
+      <div class="kv-cell">
+        <dt class="kv-label">Nivel</dt>
+        <dd class="kv-value" id="readout-threat-level">Bajo</dd>
+      </div>
+      <div class="kv-cell">
+        <dt class="kv-label">Latencia</dt>
+        <dd class="kv-value mono-stat" id="readout-latency-ms">-- ms</dd>
+      </div>
+      <div class="kv-cell">
+        <dt class="kv-label">Omitidos</dt>
+        <dd class="kv-value mono-stat" id="readout-backpressure-stat">0</dd>
+      </div>
+    </dl>
 
-  <!-- Probabilidades por clase (7 clases) -->
-  <section class="probabilities-section" aria-label="Distribución de probabilidades">
-    <div class="section-subhead">
-      <span class="subhead-title">Probabilidad de Escena</span>
-      <span class="subhead-meta mono-stat">Softmax 1.00</span>
+    <p class="readout-evidence-text" id="readout-protocol-text">
+      Conectando con el servicio local en el puerto 8000.
+    </p>
+  </section>
+
+  <section class="inspector-section probabilities-section" aria-label="Distribución de probabilidades por categoría">
+    <div class="inspector-subhead">
+      <h3 class="subhead-title">Distribución por categoría</h3>
+      <span class="subhead-meta mono-stat">7 clases</span>
     </div>
 
     <div class="prob-bars-list">
       {CANONICAL_DETECTION_CLASSES.map((clsKey) => {
         const desc = DETECTION_CLASS_CATALOG[clsKey];
         const initialPct = clsKey === 'Escena_Normal' ? 95.0 : 0.8;
+        const severityAttr = desc.defaultThreatLevel;
         return (
-          <div class="prob-bar-item" data-prob-row={clsKey}>
+          <div
+            class={`prob-bar-item${clsKey === 'Escena_Normal' ? ' prob-row-dominant' : ''}`}
+            data-prob-row={clsKey}
+            data-severity={severityAttr}
+          >
             <div class="prob-bar-labels">
-              <span class="prob-label-name">{desc.readableLabel}</span>
+              <span class="prob-label-name" title={desc.readableLabel}>{desc.readableLabel}</span>
               <span class="prob-label-value mono-stat" data-prob-value={clsKey}>
                 {initialPct.toFixed(1)}%
               </span>
@@ -86,18 +92,17 @@ import { CANONICAL_DETECTION_CLASSES, DETECTION_CLASS_CATALOG } from '../domain'
     </div>
   </section>
 
-  <!-- Historial de alertas en vivo -->
-  <section class="alerts-log-section" aria-label="Registro de alertas">
-    <div class="section-subhead">
-      <span class="subhead-title">Registro de Alertas</span>
-      <button type="button" class="btn-clear-log" id="btn-clear-alerts" title="Limpiar historial">
-        Limpiar
+  <section class="inspector-section alerts-log-section" aria-label="Registro de alertas">
+    <div class="inspector-subhead">
+      <h3 class="subhead-title">Registro de incidentes</h3>
+      <button type="button" class="btn-clear-log" id="btn-clear-alerts" title="Vaciar el historial de incidentes">
+        Limpiar historial
       </button>
     </div>
 
     <ul class="alerts-list" id="security-alert-log">
       <li class="alert-empty-state" id="alert-empty-item">
-        Supervisión activa sin incidentes críticos. Las alertas aparecerán aquí de forma automática.
+        Sin incidentes registrados en esta sesión. Las alertas detectadas aparecerán aquí en orden cronológico.
       </li>
     </ul>
   </section>

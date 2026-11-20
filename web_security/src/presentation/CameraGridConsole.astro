@@ -1,9 +1,8 @@
 ---
 /**
  * Presentation Component: CameraGridConsole.astro
- * Central CCTV Matrix & Monitoring Console:
- * - 6-Camera Grid (CAM-01 Local Active + CAM-02..06 Server Standby)
- * - Live AI Telemetry Panel
+ * VMS multi-camera wall (CAM-01 local live + CAM-02..06 server standby)
+ * paired with a docked right-hand telemetry inspector rail.
  */
 import { DEFAULT_SIX_CAMERA_NODES } from '../domain';
 import ActiveCameraViewport from './ActiveCameraViewport.astro';
@@ -16,29 +15,89 @@ const disabledServerCameras = DEFAULT_SIX_CAMERA_NODES.filter(
 ---
 
 <div class="console-workspace-layout">
-  <!-- Columna principal: Matriz de 6 Cámaras -->
-  <section class="cctv-matrix-section" aria-label="Matriz de 6 cámaras de seguridad">
-    <div class="matrix-toolbar">
-      <div class="matrix-title-group">
-        <h2 class="matrix-heading">Matriz de Monitoreo CCTV</h2>
-        <span class="matrix-badge-topology">6 Canales · 1 Activo / 5 En Espera</span>
+  <section class="cctv-wall-column" aria-label="Muro de seis cámaras de vigilancia">
+    <div class="wall-toolbar">
+      <div class="wall-toolbar-left">
+        <h2 class="wall-heading">Canales de vigilancia</h2>
+        <span class="wall-subcount">1 canal local en vivo, 5 nodos de servidor en espera</span>
       </div>
 
-      <div class="matrix-actions">
-        <button type="button" class="btn-matrix-action" id="btn-sync-cameras" title="Consultar estado de las 6 cámaras">
-          Sincronizar Nodos
+      <div class="wall-toolbar-right">
+        <div class="layout-switcher" role="group" aria-label="Distribución de cámaras">
+          <button
+            type="button"
+            class="layout-switch-btn is-active"
+            data-layout-mode="featured"
+            aria-pressed="true"
+            title="Vista principal 1+5"
+          >
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <rect x="1" y="1" width="7.5" height="7.5" rx="0.8" stroke="currentColor" stroke-width="1.2" />
+              <rect x="10.2" y="1" width="2.8" height="3" rx="0.5" stroke="currentColor" stroke-width="1.1" />
+              <rect x="10.2" y="5.5" width="2.8" height="3" rx="0.5" stroke="currentColor" stroke-width="1.1" />
+              <rect x="1" y="10.2" width="3.2" height="2.8" rx="0.5" stroke="currentColor" stroke-width="1.1" />
+              <rect x="5.4" y="10.2" width="3.2" height="2.8" rx="0.5" stroke="currentColor" stroke-width="1.1" />
+              <rect x="9.8" y="10.2" width="3.2" height="2.8" rx="0.5" stroke="currentColor" stroke-width="1.1" />
+            </svg>
+            <span>1+5</span>
+          </button>
+          <button
+            type="button"
+            class="layout-switch-btn"
+            data-layout-mode="grid"
+            aria-pressed="false"
+            title="Cuadrícula uniforme 3×2"
+          >
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <rect x="1" y="2" width="3.2" height="4.2" rx="0.5" stroke="currentColor" stroke-width="1.15" />
+              <rect x="5.4" y="2" width="3.2" height="4.2" rx="0.5" stroke="currentColor" stroke-width="1.15" />
+              <rect x="9.8" y="2" width="3.2" height="4.2" rx="0.5" stroke="currentColor" stroke-width="1.15" />
+              <rect x="1" y="7.8" width="3.2" height="4.2" rx="0.5" stroke="currentColor" stroke-width="1.15" />
+              <rect x="5.4" y="7.8" width="3.2" height="4.2" rx="0.5" stroke="currentColor" stroke-width="1.15" />
+              <rect x="9.8" y="7.8" width="3.2" height="4.2" rx="0.5" stroke="currentColor" stroke-width="1.15" />
+            </svg>
+            <span>3×2</span>
+          </button>
+          <button
+            type="button"
+            class="layout-switch-btn"
+            data-layout-mode="focus"
+            aria-pressed="false"
+            title="Enfocar cámara activa"
+          >
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <rect x="1" y="1.2" width="12" height="8" rx="0.8" stroke="currentColor" stroke-width="1.2" />
+              <line x1="1" y1="11.8" x2="13" y2="11.8" stroke="currentColor" stroke-width="1.2" />
+            </svg>
+            <span>Enfoque</span>
+          </button>
+        </div>
+
+        <button
+          type="button"
+          class="btn-toolbar-action"
+          id="btn-sync-cameras"
+          title="Consultar estado actualizado de los 6 canales"
+        >
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M13.5 8A5.5 5.5 0 1 1 11.9 4.1M13.5 2.5V5.5H10.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>Sincronizar</span>
         </button>
       </div>
     </div>
 
-    <!-- La Grilla de 6 Cámaras unificada -->
-    <div class="cctv-six-grid" role="region" aria-label="Cuadrícula de cámaras">
-      <!-- Canal 01: Cámara Local Activa (Dispositivo actual) -->
+    <div
+      class="cctv-six-grid"
+      id="cctv-six-grid"
+      data-layout="featured"
+      role="region"
+      aria-label="Cuadrícula de canales CCTV"
+    >
       <div class="cctv-grid-cell cell-active">
         <ActiveCameraViewport />
       </div>
 
-      <!-- Canales 02 a 06: Cámaras Remotas en Servidor -->
       {disabledServerCameras.map((cameraNode) => (
         <div class="cctv-grid-cell cell-remote">
           <DisabledServerCameraCard node={cameraNode} />
@@ -47,7 +106,6 @@ const disabledServerCameras = DEFAULT_SIX_CAMERA_NODES.filter(
     </div>
   </section>
 
-  <!-- Columna lateral: Panel de Telemetría de IA -->
   <div class="console-sidebar-column">
     <ModelTelemetryPanel />
   </div>

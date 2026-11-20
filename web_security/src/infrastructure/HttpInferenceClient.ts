@@ -235,7 +235,7 @@ export class HttpInferenceClient implements IInferenceApiPort {
             name: String(kpObj.name ?? ''),
             x: Number(kpObj.x ?? 0),
             y: Number(kpObj.y ?? 0),
-            confidence: Number(kpObj.confidence ?? 0)
+            confidence: Number(kpObj.confidence ?? kpObj.score ?? 0)
           };
         })
       };
@@ -254,8 +254,10 @@ export class HttpInferenceClient implements IInferenceApiPort {
 
     const rawEvidence = (raw.evidence ?? {}) as Record<string, unknown>;
     const evidence: DetectedEventEvidence = {
-      description: String(rawEvidence.description ?? 'Monitorización continua sin anomalías.'),
-      rule_triggered: String(rawEvidence.rule_triggered ?? 'scene_baseline'),
+      description: String(
+        rawEvidence.description ?? rawEvidence.evidence ?? 'Supervisión continua sin anomalías.'
+      ),
+      rule_triggered: String(rawEvidence.rule_triggered ?? rawEvidence.type ?? 'scene_baseline'),
       sustained_duration_sec: Number(rawEvidence.sustained_duration_sec ?? 0.0)
     };
 
