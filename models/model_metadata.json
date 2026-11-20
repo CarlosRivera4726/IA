@@ -21,94 +21,94 @@
     "Mujer"
   ],
   "scene_champion": {
-    "Modelo": "CNN desde cero",
-    "Accuracy": 0.5579399141630901,
-    "Precision (macro)": 0.5778071329541918,
-    "Recall (macro)": 0.5813725490196078,
-    "F1 (macro)": 0.5374456822593329,
-    "Precision (weighted)": 0.6132314416207372,
-    "Recall (weighted)": 0.5579399141630901,
-    "F1 (weighted)": 0.5504655895200345,
+    "Modelo": "ResCNN GroupNorm (sin BatchNorm)",
+    "Accuracy": 0.5781990521327014,
+    "Precision (macro)": 0.6194115724092841,
+    "Recall (macro)": 0.5761440677966101,
+    "F1 (macro)": 0.5800336423975275,
+    "Precision (weighted)": 0.6155203586960395,
+    "Recall (weighted)": 0.5781990521327014,
+    "F1 (weighted)": 0.581395660999009,
     "classification_report": {
       "Arma_Blanca": {
-        "precision": 0.3125,
-        "recall": 0.75,
-        "f1-score": 0.4411764705882353,
-        "support": 20.0
+        "precision": 0.9473684210526315,
+        "recall": 0.5625,
+        "f1-score": 0.7058823529411765,
+        "support": 32.0
       },
       "Arma_De_Fuego": {
-        "precision": 0.8333333333333334,
-        "recall": 0.49019607843137253,
-        "f1-score": 0.6172839506172839,
-        "support": 51.0
+        "precision": 0.7142857142857143,
+        "recall": 0.5932203389830508,
+        "f1-score": 0.6481481481481481,
+        "support": 59.0
       },
       "Ataque_Agresion": {
-        "precision": 0.6233766233766234,
-        "recall": 0.8888888888888888,
-        "f1-score": 0.732824427480916,
-        "support": 54.0
+        "precision": 0.5,
+        "recall": 0.775,
+        "f1-score": 0.6078431372549019,
+        "support": 40.0
       },
       "Escena_Normal": {
-        "precision": 0.49019607843137253,
-        "recall": 0.46296296296296297,
-        "f1-score": 0.47619047619047616,
-        "support": 54.0
+        "precision": 0.45714285714285713,
+        "recall": 0.4,
+        "f1-score": 0.4266666666666667,
+        "support": 40.0
       },
       "Hurto_Sospechoso": {
-        "precision": 0.6296296296296297,
-        "recall": 0.3148148148148148,
-        "f1-score": 0.41975308641975306,
-        "support": 54.0
+        "precision": 0.4782608695652174,
+        "recall": 0.55,
+        "f1-score": 0.5116279069767442,
+        "support": 40.0
       },
-      "accuracy": 0.5579399141630901,
+      "accuracy": 0.5781990521327014,
       "macro avg": {
-        "precision": 0.5778071329541918,
-        "recall": 0.5813725490196078,
-        "f1-score": 0.5374456822593329,
-        "support": 233.0
+        "precision": 0.6194115724092841,
+        "recall": 0.5761440677966101,
+        "f1-score": 0.5800336423975275,
+        "support": 211.0
       },
       "weighted avg": {
-        "precision": 0.6132314416207372,
-        "recall": 0.5579399141630901,
-        "f1-score": 0.5504655895200345,
-        "support": 233.0
+        "precision": 0.6155203586960395,
+        "recall": 0.5781990521327014,
+        "f1-score": 0.581395660999009,
+        "support": 211.0
       }
     },
     "confusion_matrix": [
       [
-        15,
-        2,
+        18,
+        9,
         3,
-        0,
-        0
+        1,
+        1
       ],
       [
-        21,
-        25,
-        5,
-        0,
-        0
+        1,
+        35,
+        17,
+        3,
+        3
       ],
       [
+        0,
         2,
+        31,
         1,
-        48,
-        1,
-        2
+        6
       ],
       [
+        0,
+        3,
         7,
-        1,
-        13,
-        25,
-        8
+        16,
+        14
       ],
       [
-        3,
-        1,
-        8,
-        25,
-        17
+        0,
+        0,
+        4,
+        14,
+        22
       ]
     ]
   },
@@ -308,7 +308,7 @@
     "snehilsanyal/weapon-detection-test (Arma_Blanca, Arma_De_Fuego)",
     "meetnagadia/human-action-recognition-har-dataset (Ataque_Agresion, Escena_Normal, Hurto_Sospechoso)",
     "cashutosh/gender-classification-dataset (Hombre, Mujer)",
-    "jangedoo/utkface-new (Holdout y Validaci\u00f3n)"
+    "jangedoo/utkface-new (Holdout y Validación)"
   ],
   "endpoints": {
     "web_console": "http://localhost:4321",

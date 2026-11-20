@@ -1,4 +1,4 @@
-﻿"""
+"""
 Adaptador de Infraestructura para el pipeline de visión artificial SentinelCV v2:
 - Carga models/sentinel_security_model.keras (Clasificador de escena Keras 3 / PyTorch CUDA)
 - Carga models/sentinel_gender_model.keras (Clasificador facial de género Keras 3)
@@ -173,16 +173,21 @@ class KerasSecurityModelAdapter(ThreatClassifierPort):
 
         return {cls_name: float(probs[i]) for i, cls_name in enumerate(self._scene_classes)}
 
-    PERSON_MIN_SCORE = 0.65
-    PERSON_NMS_IOU = 0.45
-    PERSON_MIN_VISIBLE_KPS = 3
-    PERSON_MIN_AREA = 0.01  # fracción mínima del frame
-    PERSON_CONTAIN_THRESH = 0.90
+    PERSON_MIN_SCORE = 0.78
+    PERSON_NMS_IOU = 0.40
+    PERSON_MIN_STRONG_KPS = 3
+    PERSON_STRONG_KP_LOGIT = 2.0
+    PERSON_MIN_PEAK_KP_LOGIT = 3.5
+    PERSON_MIN_AREA = 0.015  # fracción mínima del frame
+    PERSON_CONTAIN_THRESH = 0.75
+    FACE_MIN_KP_LOGIT = 2.0
+    FACE_MIN_VISIBLE_KPS = 2
+    GENDER_MIN_CONFIDENCE = 0.58
 
     def _filter_person_detections(
         self, boxes, scores, kp_logits, target_w: int, target_h: int
     ) -> List[int]:
-        """Devuelve los índices de detecciones de persona válidas (sin duplicados/ruido)."""
+        """Devuelve índices de personas reales (rechaza objetos/fondo y cajas duplicadas)."""
         candidates: List[int] = []
         for i in range(len(scores)):
             if float(scores[i]) < self.PERSON_MIN_SCORE:
@@ -191,23 +196,26 @@ class KerasSecurityModelAdapter(ThreatClassifierPort):
             area = max(0.0, (b[2] - b[0]) / target_w) * max(0.0, (b[3] - b[1]) / target_h)
             if area < self.PERSON_MIN_AREA:
                 continue
-            # Una persona real tiene varios keypoints con confianza (logit > 0 => p > 0.5)
+            # Keypoint R-CNN entrega logits reales: personas reales alcanzan > 4..18;
+            # almohadas, cortinas o sillas rara vez superan 2.0 en múltiples articulaciones.
             if len(kp_logits) > i:
-                visible = int(np.sum(np.asarray(kp_logits[i]) > 0.0))
-                if visible < self.PERSON_MIN_VISIBLE_KPS:
+                logits_arr = np.asarray(kp_logits[i], dtype=np.float32)
+                strong_count = int(np.sum(logits_arr >= self.PERSON_STRONG_KP_LOGIT))
+                peak_logit = float(np.max(logits_arr)) if logits_arr.size > 0 else -10.0
+                if strong_count < self.PERSON_MIN_STRONG_KPS or peak_logit < self.PERSON_MIN_PEAK_KP_LOGIT:
                     continue
             candidates.append(i)
 
         if not candidates:
             return []
 
-        # NMS estricto
+        # NMS para eliminar detecciones duplicadas sobre la misma persona
         t_boxes = torch.tensor(boxes[candidates], dtype=torch.float32)
         t_scores = torch.tensor(scores[candidates], dtype=torch.float32)
         kept = torchvision.ops.nms(t_boxes, t_scores, self.PERSON_NMS_IOU).tolist()
-        kept_idx = [candidates[k] for k in kept]  # ordenado por score desc
+        kept_idx = [candidates[k] for k in kept]  # ordenado por score descendente
 
-        # Supresión por contención: descartar cajas casi totalmente dentro de otra mejor
+        # Supresión por contención: descartar cajas contenidas casi totalmente dentro de otra mejor
         final: List[int] = []
         for i in kept_idx:
             bi = boxes[i]
@@ -224,11 +232,73 @@ class KerasSecurityModelAdapter(ThreatClassifierPort):
                 final.append(i)
         return final
 
+    def _extract_face_crop(
+        self,
+        img_pil: Image.Image,
+        kps_norm: Dict[str, Tuple[float, float, float]],
+        bbox: Tuple[float, float, float, float],
+    ) -> Optional[Image.Image]:
+        """
+        Recorta el rostro anclado directamente a los keypoints faciales detectados
+        (ojos, nariz, orejas), evitando recortar solo frente/fondo en planos cercanos.
+        """
+        orig_w, orig_h = img_pil.size
+        xmin, ymin, xmax, ymax = bbox
+
+        face_names = ("nose", "left_eye", "right_eye", "left_ear", "right_ear")
+        visible_face = {
+            name: (kps_norm[name][0] * orig_w, kps_norm[name][1] * orig_h)
+            for name in face_names
+            if name in kps_norm and kps_norm[name][2] >= self.FACE_MIN_KP_LOGIT
+        }
+        if len(visible_face) < self.FACE_MIN_VISIBLE_KPS:
+            return None
+
+        xs = [pt[0] for pt in visible_face.values()]
+        ys = [pt[1] for pt in visible_face.values()]
+        span_x = max(xs) - min(xs)
+
+        # Centro horizontal anclado a ojos/nariz (evita sesgo lateral cuando solo se ve 1 oreja)
+        core_pts = [visible_face[n] for n in ("nose", "left_eye", "right_eye") if n in visible_face]
+        fcx = float(np.mean([p[0] for p in core_pts])) if core_pts else float(np.mean(xs))
+
+        # Estimar ancho real de cabeza según pares de ojos u orejas visibles
+        if "left_eye" in visible_face and "right_eye" in visible_face:
+            eye_dist = abs(visible_face["left_eye"][0] - visible_face["right_eye"][0])
+            face_w = max(eye_dist * 2.55, span_x * 1.20)
+        elif "left_ear" in visible_face and "right_ear" in visible_face:
+            ear_dist = abs(visible_face["left_ear"][0] - visible_face["right_ear"][0])
+            face_w = max(ear_dist * 1.18, span_x * 1.15)
+        elif "nose" in visible_face and ("left_eye" in visible_face or "right_eye" in visible_face):
+            eye_pt = visible_face.get("left_eye") or visible_face.get("right_eye")
+            face_w = max(abs(eye_pt[0] - visible_face["nose"][0]) * 3.8, span_x * 1.45)
+        else:
+            face_w = max(span_x * 1.65, (xmax - xmin) * orig_w * 0.42)
+
+        box_w_px = max(24.0, (xmax - xmin) * orig_w)
+        face_w = max(orig_w * 0.06, min(face_w, box_w_px * 0.92))
+        face_h = face_w * 1.20
+
+        # Centro vertical ligeramente arriba de la nariz para incluir frente/cabello y mentón/barba
+        if "nose" in visible_face:
+            fcy = visible_face["nose"][1] - face_h * 0.03
+        else:
+            fcy = float(np.mean(ys)) + face_h * 0.14
+
+        f_x1 = int(max(0.0, fcx - face_w * 0.56))
+        f_x2 = int(min(float(orig_w), fcx + face_w * 0.56))
+        f_y1 = int(max(0.0, fcy - face_h * 0.60))
+        f_y2 = int(min(float(orig_h), fcy + face_h * 0.48))
+
+        if (f_x2 - f_x1) < 24 or (f_y2 - f_y1) < 24:
+            return None
+
+        return img_pil.crop((f_x1, f_y1, f_x2, f_y2)).resize((224, 224), Image.Resampling.BILINEAR)
+
     def _estimate_pose_and_gender(
         self, img_pil: Image.Image
     ) -> List[DetectedPerson]:
-        orig_w, orig_h = img_pil.size
-        # Escalar a tamaño controlado para inferencia ultra rápida (<70ms en RTX 5050)
+        # Escalar a tamaño controlado para inferencia rápida en GPU
         target_w, target_h = 448, 336
         scaled = img_pil.resize((target_w, target_h), Image.Resampling.BILINEAR)
 
@@ -249,7 +319,7 @@ class KerasSecurityModelAdapter(ThreatClassifierPort):
         keypoints = out.get("keypoints", torch.empty(0)).cpu().numpy()
         kp_logits = out.get("keypoints_scores", torch.empty(0)).cpu().numpy()
 
-        # --- Filtro anti-ruido: confianza alta + NMS + validación de keypoints + contención ---
+        # --- Filtro anti-ruido: confianza + keypoints fuertes (logit >= 2.0) + NMS + contención ---
         keep_idx = self._filter_person_detections(
             boxes, scores, kp_logits, target_w, target_h
         )
@@ -266,48 +336,39 @@ class KerasSecurityModelAdapter(ThreatClassifierPort):
             ymax = max(0.0, min(1.0, float(box[3] / target_h)))
 
             kps_list: List[DetectedKeypoint] = []
-            face_kps_scores = []
+            kps_raw_map: Dict[str, Tuple[float, float, float]] = {}
             kps_array = keypoints[idx] if len(keypoints) > idx else []
 
             for k_idx, (x, y, v) in enumerate(kps_array):
                 name = KEYPOINT_NAMES[k_idx] if k_idx < len(KEYPOINT_NAMES) else f"kp_{k_idx}"
                 norm_x = max(0.0, min(1.0, float(x / target_w)))
                 norm_y = max(0.0, min(1.0, float(y / target_h)))
-                # 'v' es solo flag de visibilidad; la confianza real es keypoints_scores (logit)
+                # Centrar sigmoide en logit=2.0 para que kp_score >= 0.50 represente keypoints reales
                 if len(kp_logits) > idx and k_idx < len(kp_logits[idx]):
-                    kp_score = float(1.0 / (1.0 + np.exp(-float(kp_logits[idx][k_idx]))))
+                    raw_logit = float(kp_logits[idx][k_idx])
+                    kp_score = float(1.0 / (1.0 + np.exp(-(raw_logit - self.PERSON_STRONG_KP_LOGIT))))
                 else:
+                    raw_logit = 3.0 if float(v) > 0 else -3.0
                     kp_score = float(v)
                 kps_list.append(DetectedKeypoint(name=name, x=norm_x, y=norm_y, score=kp_score))
-                if name in ("nose", "left_eye", "right_eye", "left_ear", "right_ear"):
-                    face_kps_scores.append(kp_score)
+                kps_raw_map[name] = (norm_x, norm_y, raw_logit)
 
-            # Clasificar género facial usando Face ROI
+            # Clasificar género facial usando recorte anclado a keypoints + TTA espejo horizontal
             gender = SubjectGender.NO_DETERMINADO
             gender_conf = 0.50
 
-            # Solo predecir género si los keypoints faciales son claramente visibles (score >= 0.40)
-            avg_face_score = float(np.mean(face_kps_scores)) if face_kps_scores else 0.0
-            if avg_face_score >= 0.15 and self._gender_model is not None:
-                # Recorte facial alrededor de la cabeza
-                head_w = max(0.12, (xmax - xmin) * 0.6)
-                head_h = max(0.14, (ymax - ymin) * 0.35)
-                cx = (xmin + xmax) * 0.5
-                f_x1 = int(max(0.0, cx - head_w * 0.5) * orig_w)
-                f_y1 = int(max(0.0, ymin) * orig_h)
-                f_x2 = int(min(1.0, cx + head_w * 0.5) * orig_w)
-                f_y2 = int(min(1.0, ymin + head_h) * orig_h)
-
-                if (f_x2 - f_x1) >= 20 and (f_y2 - f_y1) >= 20:
-                    crop = img_pil.crop((f_x1, f_y1, f_x2, f_y2)).resize((224, 224))
-                    c_arr = (np.asarray(crop, dtype=np.float32) / 127.5) - 1.0
-                    g_batch = np.expand_dims(c_arr, axis=0)
+            if self._gender_model is not None:
+                face_crop = self._extract_face_crop(img_pil, kps_raw_map, (xmin, ymin, xmax, ymax))
+                if face_crop is not None:
+                    c_arr = (np.asarray(face_crop, dtype=np.float32) / 127.5) - 1.0
+                    c_flip = c_arr[:, ::-1, :].copy()
+                    g_batch = np.stack([c_arr, c_flip], axis=0)
                     g_raw = self._gender_model(g_batch, training=False)
-                    g_probs = keras.ops.convert_to_numpy(g_raw)[0].astype(np.float64)
+                    g_probs = keras.ops.convert_to_numpy(g_raw).astype(np.float64).mean(axis=0)
                     best_g_idx = int(np.argmax(g_probs))
                     best_g_conf = float(g_probs[best_g_idx])
 
-                    if best_g_conf >= 0.60:
+                    if best_g_conf >= self.GENDER_MIN_CONFIDENCE:
                         gender = (
                             SubjectGender.HOMBRE
                             if best_g_idx == 0
@@ -326,7 +387,7 @@ class KerasSecurityModelAdapter(ThreatClassifierPort):
             rs = kps_by_name.get("right_shoulder")
             has_arms_up = False
             if lw and rw and ls and rs:
-                if lw.score >= 0.55 and rw.score >= 0.55 and ls.score >= 0.50 and rs.score >= 0.50:
+                if lw.score >= 0.50 and rw.score >= 0.50 and ls.score >= 0.45 and rs.score >= 0.45:
                     shoulder_y = min(ls.y, rs.y)
                     if (shoulder_y - lw.y > 0.09) and (shoulder_y - rw.y > 0.09):
                         has_arms_up = True

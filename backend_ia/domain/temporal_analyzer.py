@@ -2,23 +2,44 @@
 Analizador temporal de seguridad puro (Clean Architecture - Capa de Dominio).
 Aplica análisis temporal sobre ventanas de 3.0 segundos por cámara:
 - No emite eventos con un solo fotograma aislado.
+- Asocia personas por IoU espacial entre frames y suaviza su género por consenso temporal.
+- Exige actividad física (movimiento articular/corporal o interacción de >= 2 personas)
+  además de persistencia de escena para confirmar Ataque_Agresion, evitando falsos positivos
+  cuando una persona está quieta frente a cámara.
 - Detecta señales de auxilio continuas (ambas muñecas sobre hombros/cabeza >= 1.0 s).
-- Detecta persistencia de armas cerca de manos (>= 2 frames consecutivos).
-- Detecta agresiones físicas sostenidas y hurtos sospechosos.
+- Detecta persistencia de armas cerca de personas (>= 2 frames recientes).
 - Respeta precedencia por severidad: Armas > Ataque > Auxilio > Hurto > Escena Normal.
-- Mantiene memoria de género por persona rastreada.
 - Cero dependencias de librerías externas o frameworks.
 """
 
+import math
 from typing import Dict, List, Optional, Tuple
 from backend_ia.domain.entities import (
     DetectedEventEvidence,
-    DetectedObject,
     DetectedPerson,
     FrameObservation,
     SubjectGender,
     ThreatLevel,
 )
+
+
+def _bbox_iou(a: List[float], b: List[float]) -> float:
+    ix1 = max(a[0], b[0])
+    iy1 = max(a[1], b[1])
+    ix2 = min(a[2], b[2])
+    iy2 = min(a[3], b[3])
+    iw = max(0.0, ix2 - ix1)
+    ih = max(0.0, iy2 - iy1)
+    inter = iw * ih
+    if inter <= 0.0:
+        return 0.0
+    area_a = max(1e-6, (a[2] - a[0]) * (a[3] - a[1]))
+    area_b = max(1e-6, (b[2] - b[0]) * (b[3] - b[1]))
+    return inter / max(1e-6, area_a + area_b - inter)
+
+
+def _bbox_center(b: List[float]) -> Tuple[float, float]:
+    return ((b[0] + b[2]) * 0.5, (b[1] + b[3]) * 0.5)
 
 
 class TemporalSecurityAnalyzer:
@@ -28,11 +49,145 @@ class TemporalSecurityAnalyzer:
         self.window_ms = window_ms
         self.gap_reset_ms = gap_reset_ms
         self._windows: Dict[str, List[FrameObservation]] = {}
-        self._gender_memory: Dict[str, Dict[int, Tuple[SubjectGender, float]]] = {}
+        # track_id -> (ultimo_bbox, ultimo_ts)
+        self._tracks: Dict[str, Dict[int, Tuple[List[float], int]]] = {}
+        self._next_track_id: Dict[str, int] = {}
+        # track_id -> lista reciente de (SubjectGender, confidence)
+        self._gender_votes: Dict[str, Dict[int, List[Tuple[SubjectGender, float]]]] = {}
 
     def reset_camera(self, camera_id: str) -> None:
         self._windows.pop(camera_id, None)
-        self._gender_memory.pop(camera_id, None)
+        self._tracks.pop(camera_id, None)
+        self._next_track_id.pop(camera_id, None)
+        self._gender_votes.pop(camera_id, None)
+
+    def _assign_tracks_and_smooth_gender(
+        self, camera_id: str, persons: List[DetectedPerson], frame_ts: int
+    ) -> List[DetectedPerson]:
+        tracks = self._tracks.setdefault(camera_id, {})
+        votes_map = self._gender_votes.setdefault(camera_id, {})
+
+        # Expirar tracks inactivos hace más de 3.0 segundos
+        stale_ids = [tid for tid, (_, ts) in tracks.items() if (frame_ts - ts) > self.window_ms]
+        for tid in stale_ids:
+            tracks.pop(tid, None)
+            votes_map.pop(tid, None)
+
+        used_tids = set()
+        updated: List[DetectedPerson] = []
+
+        for p in persons:
+            best_tid: Optional[int] = None
+            best_score = 0.0
+            pcx, pcy = _bbox_center(p.bbox)
+
+            for tid, (prev_bbox, _) in tracks.items():
+                if tid in used_tids:
+                    continue
+                iou = _bbox_iou(p.bbox, prev_bbox)
+                tcx, tcy = _bbox_center(prev_bbox)
+                dist = math.hypot(pcx - tcx, pcy - tcy)
+                match_score = iou if iou >= 0.25 else (max(0.0, 0.24 - dist) if dist <= 0.18 else 0.0)
+                if match_score > best_score:
+                    best_score = match_score
+                    best_tid = tid
+
+            if best_tid is None:
+                best_tid = self._next_track_id.get(camera_id, 1)
+                self._next_track_id[camera_id] = best_tid + 1
+
+            used_tids.add(best_tid)
+            tracks[best_tid] = (p.bbox, frame_ts)
+
+            # Votación ponderada por confianza de género en ventana reciente
+            track_votes = votes_map.setdefault(best_tid, [])
+            if p.gender != SubjectGender.NO_DETERMINADO and p.gender_confidence >= 0.58:
+                track_votes.append((p.gender, p.gender_confidence))
+                if len(track_votes) > 8:
+                    track_votes.pop(0)
+
+            resolved_gender = SubjectGender.NO_DETERMINADO
+            resolved_conf = p.gender_confidence
+            if track_votes:
+                h_sum = sum(c for g, c in track_votes if g == SubjectGender.HOMBRE)
+                m_sum = sum(c for g, c in track_votes if g == SubjectGender.MUJER)
+                total = h_sum + m_sum
+                if total > 0.0:
+                    if h_sum >= m_sum and (h_sum / total) >= 0.60:
+                        resolved_gender = SubjectGender.HOMBRE
+                        h_confs = [c for g, c in track_votes if g == SubjectGender.HOMBRE]
+                        resolved_conf = sum(h_confs) / len(h_confs)
+                    elif m_sum > h_sum and (m_sum / total) >= 0.60:
+                        resolved_gender = SubjectGender.MUJER
+                        m_confs = [c for g, c in track_votes if g == SubjectGender.MUJER]
+                        resolved_conf = sum(m_confs) / len(m_confs)
+
+            updated.append(
+                DetectedPerson(
+                    track_id=best_tid,
+                    bbox=p.bbox,
+                    score=p.score,
+                    gender=resolved_gender,
+                    gender_confidence=resolved_conf,
+                    keypoints=p.keypoints,
+                )
+            )
+
+        return updated
+
+    def _estimate_physical_activity(
+        self, history: List[FrameObservation]
+    ) -> Tuple[float, bool]:
+        """
+        Calcula el desplazamiento medio articular/corporal entre fotogramas consecutivos
+        y detecta si existen >= 2 personas en proximidad física directa.
+        """
+        displacements: List[float] = []
+        multi_person_close = False
+
+        for idx, obs in enumerate(history):
+            # Verificar proximidad entre pares de personas en el mismo frame
+            if len(obs.persons) >= 2:
+                for i in range(len(obs.persons)):
+                    for j in range(i + 1, len(obs.persons)):
+                        b1, b2 = obs.persons[i].bbox, obs.persons[j].bbox
+                        iou = _bbox_iou(b1, b2)
+                        c1, c2 = _bbox_center(b1), _bbox_center(b2)
+                        if iou >= 0.08 or math.hypot(c1[0] - c2[0], c1[1] - c2[1]) <= 0.35:
+                            multi_person_close = True
+
+            if idx == 0:
+                continue
+            prev_obs = history[idx - 1]
+            prev_by_id = {p.track_id: p for p in prev_obs.persons}
+
+            for p in obs.persons:
+                prev_p = prev_by_id.get(p.track_id)
+                if prev_p is None:
+                    continue
+                # Comparar desplazamiento de muñecas/codos/hombros y centro de caja
+                prev_kps = {kp.name: kp for kp in prev_p.keypoints}
+                kp_moves: List[float] = []
+                for kp in p.keypoints:
+                    if kp.name in (
+                        "left_wrist",
+                        "right_wrist",
+                        "left_elbow",
+                        "right_elbow",
+                        "left_shoulder",
+                        "right_shoulder",
+                    ) and kp.score >= 0.50:
+                        pk = prev_kps.get(kp.name)
+                        if pk and pk.score >= 0.50:
+                            kp_moves.append(math.hypot(kp.x - pk.x, kp.y - pk.y))
+                c_now = _bbox_center(p.bbox)
+                c_prev = _bbox_center(prev_p.bbox)
+                body_move = math.hypot(c_now[0] - c_prev[0], c_now[1] - c_prev[1])
+                step_move = max([body_move] + kp_moves)
+                displacements.append(step_move)
+
+        avg_motion = (sum(displacements) / len(displacements)) if displacements else 0.0
+        return avg_motion, multi_person_close
 
     def push_and_evaluate(
         self, camera_id: str, observation: FrameObservation
@@ -42,11 +197,21 @@ class TemporalSecurityAnalyzer:
         if history:
             gap = observation.frame_ts - history[-1].frame_ts
             if gap > self.gap_reset_ms or gap < 0:
-                # Salto temporal brusco: reiniciar ventana
                 history.clear()
-                self._gender_memory.pop(camera_id, None)
+                self._tracks.pop(camera_id, None)
+                self._gender_votes.pop(camera_id, None)
 
-        history.append(observation)
+        # 2. Rastreo espacial por IoU y suavizado temporal de género
+        updated_persons = self._assign_tracks_and_smooth_gender(
+            camera_id, observation.persons, observation.frame_ts
+        )
+        tracked_obs = FrameObservation(
+            frame_ts=observation.frame_ts,
+            persons=updated_persons,
+            objects=observation.objects,
+            scene_probabilities=observation.scene_probabilities,
+        )
+        history.append(tracked_obs)
 
         # Descartar observaciones fuera de la ventana de window_ms
         cutoff_ts = observation.frame_ts - self.window_ms
@@ -62,107 +227,113 @@ class TemporalSecurityAnalyzer:
             "seconds": round(duration_sec, 2),
         }
 
-        # 2. Actualizar memoria de género por persona
-        cam_gender_mem = self._gender_memory.setdefault(camera_id, {})
-        updated_persons: List[DetectedPerson] = []
-        for p in observation.persons:
-            current_g = p.gender
-            current_conf = p.gender_confidence
-            if current_g != SubjectGender.NO_DETERMINADO and current_conf >= 0.60:
-                cam_gender_mem[p.track_id] = (current_g, current_conf)
-            elif p.track_id in cam_gender_mem:
-                # Recuperar género previamente reconocido
-                cached_g, cached_conf = cam_gender_mem[p.track_id]
-                p = DetectedPerson(
-                    track_id=p.track_id,
-                    bbox=p.bbox,
-                    score=p.score,
-                    gender=cached_g,
-                    gender_confidence=cached_conf,
-                    keypoints=p.keypoints,
-                )
-            updated_persons.append(p)
-
-        # Si solo tenemos 1 frame, no se emite ningún evento (requisito anti-falsos positivos)
+        # Si solo tenemos 1 frame, no se emite ninguna alarma (requisito anti-falsos positivos)
         if n_frames <= 1:
             events = [
                 DetectedEventEvidence(
                     type="Escena_Normal",
                     confidence=0.95,
-                    evidence="Acumulando ventana temporal (1 fotograma registrado)",
+                    evidence="Acumulando ventana temporal (1 fotograma registrado).",
                 )
             ]
             return "Escena_Normal", ThreatLevel.LOW, 0.95, events, window_info, updated_persons
 
-        # 3. Evaluar reglas temporales
+        # 3. Evaluar reglas temporales y actividad física
         detected_events: List[DetectedEventEvidence] = []
+        avg_motion, multi_person_close = self._estimate_physical_activity(history)
 
         # A. Detección de Armas (Arma_De_Fuego / Arma_Blanca)
-        # Regla: Arma detectada cerca de mano en >= 2 frames consecutivos o recientes
-        gun_count = 0
-        knife_count = 0
+        gun_obj_hits = 0
+        knife_obj_hits = 0
+        gun_scene_hits = 0
+        knife_scene_hits = 0
         gun_conf_sum = 0.0
         knife_conf_sum = 0.0
 
-        for obs in history[-3:]:  # Revisar los últimos 3 frames
+        for obs in history[-3:]:
+            frame_gun_obj = False
+            frame_knife_obj = False
             for obj in obs.objects:
                 if obj.label in ("gun", "handgun", "pistol", "rifle", "Arma_De_Fuego"):
-                    gun_count += 1
+                    frame_gun_obj = True
                     gun_conf_sum += obj.confidence
                 elif obj.label in ("knife", "cuchillo", "Arma_Blanca"):
-                    knife_count += 1
+                    frame_knife_obj = True
                     knife_conf_sum += obj.confidence
+            if frame_gun_obj:
+                gun_obj_hits += 1
+            if frame_knife_obj:
+                knife_obj_hits += 1
 
-            # También verificar clasificador de escena si la probabilidad es muy alta
-            if obs.scene_probabilities.get("Arma_De_Fuego", 0.0) >= 0.65:
-                gun_count += 1
-                gun_conf_sum += obs.scene_probabilities["Arma_De_Fuego"]
-            if obs.scene_probabilities.get("Arma_Blanca", 0.0) >= 0.65:
-                knife_count += 1
-                knife_conf_sum += obs.scene_probabilities["Arma_Blanca"]
+            p_gun = obs.scene_probabilities.get("Arma_De_Fuego", 0.0)
+            p_knife = obs.scene_probabilities.get("Arma_Blanca", 0.0)
+            if p_gun >= 0.78:
+                gun_scene_hits += 1
+                gun_conf_sum += p_gun
+            if p_knife >= 0.78:
+                knife_scene_hits += 1
+                knife_conf_sum += p_knife
 
-        if gun_count >= 2:
-            avg_c = min(0.99, gun_conf_sum / max(1, gun_count))
+        gun_total = gun_obj_hits + gun_scene_hits
+        if gun_obj_hits >= 2 or gun_scene_hits >= 2 or (gun_obj_hits >= 1 and gun_scene_hits >= 1):
+            avg_c = min(0.99, gun_conf_sum / max(1, gun_total))
             detected_events.append(
                 DetectedEventEvidence(
                     type="Arma_De_Fuego",
                     confidence=avg_c,
-                    evidence=f"Arma de fuego detectada de forma persistente en {gun_count} observaciones recientes.",
+                    evidence=f"Arma de fuego confirmada en {gun_total} observaciones recientes.",
                 )
             )
 
-        if knife_count >= 2:
-            avg_c = min(0.99, knife_conf_sum / max(1, knife_count))
+        knife_total = knife_obj_hits + knife_scene_hits
+        if knife_obj_hits >= 2 or knife_scene_hits >= 2 or (knife_obj_hits >= 1 and knife_scene_hits >= 1):
+            avg_c = min(0.99, knife_conf_sum / max(1, knife_total))
             detected_events.append(
                 DetectedEventEvidence(
                     type="Arma_Blanca",
                     confidence=avg_c,
-                    evidence=f"Arma blanca detectada en mano de forma persistente en {knife_count} observaciones recientes.",
+                    evidence=f"Arma blanca confirmada en {knife_total} observaciones recientes.",
                 )
             )
 
         # B. Detección de Ataque o Agresión Física (Ataque_Agresion)
-        # Regla: Probabilidad de ataque sostenida >= 0.55 en al menos el 50% de la ventana
+        # Evita falsos positivos en personas quietas frente a cámara: requiere alta probabilidad
+        # sostenida corroborada con interacción de >= 2 personas o movimiento brusco,
+        # o consenso visual abrumador (>= 0.88).
         ataque_hits = 0
+        ataque_extreme_hits = 0
         ataque_conf_sum = 0.0
         for obs in history:
             p_at = obs.scene_probabilities.get("Ataque_Agresion", 0.0)
-            if p_at >= 0.52:
+            if p_at >= 0.68:
                 ataque_hits += 1
                 ataque_conf_sum += p_at
+            if p_at >= 0.88:
+                ataque_extreme_hits += 1
 
-        if n_frames >= 3 and ataque_hits >= max(2, int(n_frames * 0.45)) and duration_sec >= 0.7:
+        has_physical_agitation = multi_person_close or avg_motion >= 0.032
+        ataque_confirmed = (
+            n_frames >= 3
+            and duration_sec >= 0.9
+            and (
+                (ataque_hits >= max(3, int(n_frames * 0.60)) and has_physical_agitation)
+                or (ataque_extreme_hits >= max(3, int(n_frames * 0.75)))
+            )
+        )
+        if ataque_confirmed:
             avg_c = min(0.98, ataque_conf_sum / max(1, ataque_hits))
             detected_events.append(
                 DetectedEventEvidence(
                     type="Ataque_Agresion",
                     confidence=avg_c,
-                    evidence=f"Patrón de agresión/pelea física sostenido en {ataque_hits}/{n_frames} frames ({duration_sec:.1f} s).",
+                    evidence=(
+                        f"Patrón de agresión física sostenido en {ataque_hits}/{n_frames} frames "
+                        f"({duration_sec:.1f} s, actividad={avg_motion:.3f})."
+                    ),
                 )
             )
 
         # C. Detección de Señal de Auxilio a Cámara (Senal_Auxilio_Hombre / Senal_Auxilio_Mujer)
-        # Regla: Persona de frente con ambas muñecas por encima del nivel de hombros/cabeza durante >= 1.0 s
         auxilio_frames = 0
         dominant_gender = SubjectGender.NO_DETERMINADO
         highest_g_conf = 0.0
@@ -170,22 +341,19 @@ class TemporalSecurityAnalyzer:
         for obs in history:
             frame_has_signal = False
             for p in obs.persons:
-                # Buscar keypoints: left_wrist, right_wrist, left_shoulder, right_shoulder, nose
                 kps = {kp.name: kp for kp in p.keypoints}
                 lw = kps.get("left_wrist")
                 rw = kps.get("right_wrist")
                 ls = kps.get("left_shoulder")
                 rs = kps.get("right_shoulder")
-                nose = kps.get("nose")
 
                 if lw and rw and ls and rs:
-                    # En coordenadas de imagen, Y menor significa más arriba
-                    if lw.score >= 0.55 and rw.score >= 0.55 and ls.score >= 0.50 and rs.score >= 0.50:
+                    if lw.score >= 0.50 and rw.score >= 0.50 and ls.score >= 0.45 and rs.score >= 0.45:
                         shoulder_y = min(ls.y, rs.y)
                         hands_up = (shoulder_y - lw.y > 0.09) and (shoulder_y - rw.y > 0.09)
                         if hands_up:
                             frame_has_signal = True
-                            if p.gender_confidence > highest_g_conf:
+                            if p.gender != SubjectGender.NO_DETERMINADO and p.gender_confidence > highest_g_conf:
                                 dominant_gender = p.gender
                                 highest_g_conf = p.gender_confidence
                             break
@@ -196,17 +364,16 @@ class TemporalSecurityAnalyzer:
             signal_type = (
                 "Senal_Auxilio_Mujer"
                 if dominant_gender == SubjectGender.MUJER
-                else (
-                    "Senal_Auxilio_Hombre"
-                    if dominant_gender == SubjectGender.HOMBRE
-                    else "Senal_Auxilio_Hombre"  # Default si no determinado
-                )
+                else "Senal_Auxilio_Hombre"
             )
             detected_events.append(
                 DetectedEventEvidence(
                     type=signal_type,
                     confidence=0.88,
-                    evidence=f"Ambas muñecas sobre el nivel de los hombros/cabeza de forma continua en {auxilio_frames}/{n_frames} frames ({duration_sec:.1f} s).",
+                    evidence=(
+                        f"Ambas muñecas sobre el nivel de los hombros de forma continua en "
+                        f"{auxilio_frames}/{n_frames} frames ({duration_sec:.1f} s)."
+                    ),
                 )
             )
 
@@ -215,22 +382,29 @@ class TemporalSecurityAnalyzer:
         hurto_conf_sum = 0.0
         for obs in history:
             p_h = obs.scene_probabilities.get("Hurto_Sospechoso", 0.0)
-            if p_h >= 0.55:
+            if p_h >= 0.72 and len(obs.persons) >= 1:
                 hurto_hits += 1
                 hurto_conf_sum += p_h
 
-        if n_frames >= 3 and hurto_hits >= max(2, int(n_frames * 0.50)) and duration_sec >= 0.9:
+        if (
+            n_frames >= 3
+            and hurto_hits >= max(3, int(n_frames * 0.60))
+            and duration_sec >= 1.1
+            and avg_motion >= 0.020
+        ):
             avg_c = min(0.92, hurto_conf_sum / max(1, hurto_hits))
             detected_events.append(
                 DetectedEventEvidence(
                     type="Hurto_Sospechoso",
                     confidence=avg_c,
-                    evidence=f"Patrón de sustracción/manipulación sospechosa sostenido en {hurto_hits}/{n_frames} frames ({duration_sec:.1f} s). (Alerta orientativa en cámara fija)",
+                    evidence=(
+                        f"Patrón de sustracción sospechosa sostenido en {hurto_hits}/{n_frames} frames "
+                        f"({duration_sec:.1f} s)."
+                    ),
                 )
             )
 
-        # 4. Precedencia por Severidad
-        # Armas > Ataque > Auxilio > Hurto > Escena_Normal
+        # 4. Precedencia por Severidad: Armas > Ataque > Auxilio > Hurto > Escena_Normal
         severity_rank = {
             "Arma_De_Fuego": (100, ThreatLevel.CRITICAL),
             "Arma_Blanca": (95, ThreatLevel.CRITICAL),
@@ -242,7 +416,6 @@ class TemporalSecurityAnalyzer:
         }
 
         if detected_events:
-            # Ordenar por severidad decreciente
             detected_events.sort(
                 key=lambda ev: severity_rank.get(ev.type, (0, ThreatLevel.LOW))[0],
                 reverse=True,
@@ -259,13 +432,15 @@ class TemporalSecurityAnalyzer:
             )
 
         # E. Escena Normal
-        norm_conf = observation.scene_probabilities.get("Escena_Normal", 0.85)
+        norm_conf = max(
+            observation.scene_probabilities.get("Escena_Normal", 0.0),
+            0.85 if not detected_events else 0.70,
+        )
         normal_ev = [
             DetectedEventEvidence(
                 type="Escena_Normal",
-                confidence=norm_conf,
-                evidence=f"Monitoreo normal sin anomalías confirmadas ({n_frames} frames evaluados en {duration_sec:.1f} s).",
+                confidence=round(min(0.99, norm_conf), 4),
+                evidence=f"Monitoreo normal sin anomalías confirmadas ({n_frames} frames en {duration_sec:.1f} s).",
             )
         ]
-        return "Escena_Normal", ThreatLevel.LOW, norm_conf, normal_ev, window_info, updated_persons
-
+        return "Escena_Normal", ThreatLevel.LOW, round(min(0.99, norm_conf), 4), normal_ev, window_info, updated_persons
